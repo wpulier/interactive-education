@@ -46,6 +46,23 @@ export default function Home() {
           );
         })}
       </div>
+
+      <div className="mt-10 pt-8" style={{ borderTop: "1px solid var(--border)" }}>
+        <Link
+          href="/generate"
+          className="block p-5 rounded-2xl border border-dashed border-[var(--border)] hover:border-[var(--accent)] transition-colors text-center"
+        >
+          <p
+            className="text-lg mb-1"
+            style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
+          >
+            Generate Lessons
+          </p>
+          <p className="text-sm text-[var(--text3)]">
+            Turn any text, URL, or PDF into interactive lessons.
+          </p>
+        </Link>
+      </div>
     </main>
   );
 }
