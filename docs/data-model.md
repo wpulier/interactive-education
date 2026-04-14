@@ -59,9 +59,22 @@ type Section = {
 };
 ```
 
+### Unified display
+
+Every subject page **always shows both headings** — Concepts and Works — even when one category is empty. Empty categories show "No concepts yet." or "No works yet." This keeps the data model visible and consistent across all subjects.
+
 ### How the UI distinguishes them
 
 The subject page groups sections under **Concepts** and **Works** headings. Work cards show the author and year. Section pages for works display the author/year beneath the title. This makes it immediately clear whether you're browsing standalone concept lessons or studying a specific text.
+
+### Sub-concept navigation
+
+Concept sections show their child concepts inline on the subject page. Users have two navigation paths:
+
+1. **Click the section** (e.g., "Rhythm") → go to the section page, work through concepts in order
+2. **Click a sub-concept directly** (e.g., "› Time Signatures") → jump straight to that lesson
+
+This lets users browse the table of contents and jump to any level without navigating through intermediate pages. The section acts as a grouping header, but individual concepts are always directly accessible.
 
 ## Concept
 

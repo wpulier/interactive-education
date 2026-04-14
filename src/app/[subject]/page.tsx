@@ -41,67 +41,117 @@ export default async function SubjectPage({
       </h1>
       <p className="text-[var(--text2)] mb-8">{subject.description}</p>
 
-      {conceptSections.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--text3)] mb-3">
-            Concepts
-          </h2>
+      {/* Concepts */}
+      <div className="mb-10">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--text3)] mb-3">
+          Concepts
+        </h2>
+        {conceptSections.length === 0 ? (
+          <p className="text-sm text-[var(--text3)] italic">
+            No concepts yet.
+          </p>
+        ) : (
           <div className="space-y-3">
             {conceptSections.map((section) => (
-              <Link
+              <div
                 key={section.slug}
-                href={`/${subjectSlug}/${section.slug}`}
-                className="block p-5 rounded-2xl bg-[var(--bg2)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+                className="rounded-2xl bg-[var(--bg2)] border border-[var(--border)] overflow-hidden"
               >
-                <div className="flex items-baseline justify-between">
-                  <h3 className="font-serif text-xl">{section.title}</h3>
-                  <span className="text-xs text-[var(--text3)]">
-                    {section.concepts.length}{" "}
-                    {section.concepts.length === 1 ? "lesson" : "lessons"}
-                  </span>
-                </div>
-                <p className="text-sm text-[var(--text2)] mt-1">
-                  {section.description}
-                </p>
-              </Link>
+                <Link
+                  href={`/${subjectSlug}/${section.slug}`}
+                  className="block p-5 hover:bg-[var(--bg)] transition-colors"
+                >
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="font-serif text-xl">{section.title}</h3>
+                    <span className="text-xs text-[var(--text3)]">
+                      {section.concepts.length}{" "}
+                      {section.concepts.length === 1 ? "lesson" : "lessons"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-[var(--text2)] mt-1">
+                    {section.description}
+                  </p>
+                </Link>
+                {section.concepts.length > 0 && (
+                  <div className="border-t border-[var(--border)] px-5 py-2">
+                    {section.concepts.map((concept) => (
+                      <Link
+                        key={concept.slug}
+                        href={`/${subjectSlug}/${section.slug}/${concept.slug}`}
+                        className="flex items-baseline gap-3 py-1.5 text-sm hover:text-[var(--accent)] transition-colors"
+                      >
+                        <span className="text-[var(--text3)] text-xs">›</span>
+                        <span>{concept.title}</span>
+                        <span className="text-xs text-[var(--text3)] ml-auto">
+                          {concept.description}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {workSections.length > 0 && (
-        <div>
-          <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--text3)] mb-3">
-            Works
-          </h2>
+      {/* Works */}
+      <div>
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--text3)] mb-3">
+          Works
+        </h2>
+        {workSections.length === 0 ? (
+          <p className="text-sm text-[var(--text3)] italic">No works yet.</p>
+        ) : (
           <div className="space-y-3">
             {workSections.map((section) => (
-              <Link
+              <div
                 key={section.slug}
-                href={`/${subjectSlug}/${section.slug}`}
-                className="block p-5 rounded-2xl bg-[var(--bg2)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+                className="rounded-2xl bg-[var(--bg2)] border border-[var(--border)] overflow-hidden"
               >
-                <div className="flex items-baseline justify-between">
-                  <h3 className="font-serif text-xl">{section.title}</h3>
-                  <span className="text-xs text-[var(--text3)]">
-                    {section.concepts.length}{" "}
-                    {section.concepts.length === 1 ? "chapter" : "chapters"}
-                  </span>
-                </div>
-                {section.meta && (
-                  <p className="text-xs text-[var(--text3)] mt-1">
-                    {section.meta.author}
-                    {section.meta.year && `, ${section.meta.year}`}
+                <Link
+                  href={`/${subjectSlug}/${section.slug}`}
+                  className="block p-5 hover:bg-[var(--bg)] transition-colors"
+                >
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="font-serif text-xl">{section.title}</h3>
+                    <span className="text-xs text-[var(--text3)]">
+                      {section.concepts.length}{" "}
+                      {section.concepts.length === 1 ? "chapter" : "chapters"}
+                    </span>
+                  </div>
+                  {section.meta && (
+                    <p className="text-xs text-[var(--text3)] mt-1">
+                      {section.meta.author}
+                      {section.meta.year && `, ${section.meta.year}`}
+                    </p>
+                  )}
+                  <p className="text-sm text-[var(--text2)] mt-1">
+                    {section.description}
                   </p>
+                </Link>
+                {section.concepts.length > 0 && (
+                  <div className="border-t border-[var(--border)] px-5 py-2">
+                    {section.concepts.map((concept) => (
+                      <Link
+                        key={concept.slug}
+                        href={`/${subjectSlug}/${section.slug}/${concept.slug}`}
+                        className="flex items-baseline gap-3 py-1.5 text-sm hover:text-[var(--accent)] transition-colors"
+                      >
+                        <span className="text-[var(--text3)] text-xs">›</span>
+                        <span>{concept.title}</span>
+                        <span className="text-xs text-[var(--text3)] ml-auto">
+                          {concept.description}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
                 )}
-                <p className="text-sm text-[var(--text2)] mt-1">
-                  {section.description}
-                </p>
-              </Link>
+              </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 }

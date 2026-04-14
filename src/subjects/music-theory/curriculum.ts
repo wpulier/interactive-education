@@ -16,6 +16,13 @@ export const sections: Section[] = [
       },
     ],
   },
+  {
+    slug: "harmony",
+    title: "Harmony",
+    description: "How notes combine into chords and progressions.",
+    type: "concepts",
+    concepts: [],
+  },
 ];
 
 export function getSection(slug: string): Section | undefined {
