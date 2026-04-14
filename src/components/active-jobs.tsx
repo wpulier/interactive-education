@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
-import { getJobStatus, type JobStatus } from "@/lib/api";
+import { getJobStatus } from "@/lib/api";
 
 interface Job {
   job_id: string;
@@ -16,51 +15,60 @@ interface Job {
 export function ActiveJobs({ initialJobs }: { initialJobs: Job[] }) {
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const errorCount = useRef(0);
 
   const activeJobs = jobs.filter((j) => j.status === "pending" || j.status === "processing");
-  const justCompleted = jobs.filter(
-    (j) =>
-      (j.status === "complete" || j.status === "failed") &&
-      !initialJobs.some((ij) => ij.job_id === j.job_id && (ij.status === "complete" || ij.status === "failed"))
-  );
 
   useEffect(() => {
-    if (activeJobs.length === 0 && justCompleted.length === 0) return;
+    if (activeJobs.length === 0) return;
+
+    errorCount.current = 0;
 
     pollRef.current = setInterval(async () => {
-      const updated = await Promise.all(
-        jobs
-          .filter((j) => j.status === "pending" || j.status === "processing")
-          .map(async (j) => {
-            try {
-              const status = await getJobStatus(j.job_id);
-              return { ...j, status: status.status, progress: status.progress, error: status.error || null };
-            } catch {
-              return j;
-            }
-          })
-      );
-
-      setJobs((prev) =>
-        prev.map((j) => {
-          const u = updated.find((u) => u.job_id === j.job_id);
-          return u || j;
-        })
-      );
-
-      // Stop polling when all done
-      const stillActive = updated.some((j) => j.status === "pending" || j.status === "processing");
-      if (!stillActive && pollRef.current) {
-        clearInterval(pollRef.current);
-        // Refresh the page to update server-rendered sections
-        window.location.reload();
+      // Stop polling after 5 consecutive errors
+      if (errorCount.current >= 5) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        return;
       }
-    }, 2000);
+
+      try {
+        const updated = await Promise.all(
+          jobs
+            .filter((j) => j.status === "pending" || j.status === "processing")
+            .map(async (j) => {
+              try {
+                const status = await getJobStatus(j.job_id);
+                return { ...j, status: status.status, progress: status.progress, error: status.error || null };
+              } catch {
+                return j;
+              }
+            })
+        );
+
+        errorCount.current = 0;
+
+        setJobs((prev) =>
+          prev.map((j) => {
+            const u = updated.find((u) => u.job_id === j.job_id);
+            return u || j;
+          })
+        );
+
+        // Stop polling when all done
+        const stillActive = updated.some((j) => j.status === "pending" || j.status === "processing");
+        if (!stillActive && pollRef.current) {
+          clearInterval(pollRef.current);
+          window.location.reload();
+        }
+      } catch {
+        errorCount.current++;
+      }
+    }, 3000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [activeJobs.length]);
+  }, [initialJobs.length]);
 
   if (activeJobs.length === 0) return null;
 

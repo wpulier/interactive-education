@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { startGeneration, startPdfGeneration } from "@/lib/api";
 
 type SourceType = "text" | "url" | "pdf";
@@ -86,16 +85,9 @@ export default function GeneratePage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <div className="max-w-[720px] mx-auto px-6 py-12">
-        <Link
-          href="/"
-          className="text-sm text-[var(--text3)] hover:text-[var(--accent)] transition-colors"
-        >
-          &larr; Home
-        </Link>
-
+      <div className="max-w-[720px] mx-auto px-6 py-8">
         <h1
-          className="text-3xl mt-4 mb-1 tracking-tight"
+          className="text-3xl mb-1 tracking-tight"
           style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
         >
           Generate Lessons

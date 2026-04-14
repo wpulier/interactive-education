@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { Providers } from "@/components/providers";
-import { UserMenu } from "@/components/user-menu";
+import { Nav } from "@/components/nav";
 import "./globals.css";
 
 const sans = DM_Sans({
@@ -31,9 +31,7 @@ export default function RootLayout({
     <html lang="en" className={`${sans.variable} ${serif.variable}`}>
       <body className="font-sans bg-[var(--bg)] text-[var(--text)] antialiased">
         <Providers>
-          <header className="fixed top-0 right-0 p-4 z-50">
-            <UserMenu />
-          </header>
+          <Nav />
           {children}
         </Providers>
       </body>

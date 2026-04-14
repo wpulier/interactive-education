@@ -61,15 +61,8 @@ export default async function ProfilePage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <div className="max-w-[720px] mx-auto px-6 py-12">
-        <Link
-          href="/"
-          className="text-sm text-[var(--text3)] hover:text-[var(--accent)] transition-colors"
-        >
-          &larr; Home
-        </Link>
-
-        <div className="flex items-center gap-4 mt-4 mb-8">
+      <div className="max-w-[720px] mx-auto px-6 py-8">
+        <div className="flex items-center gap-4 mb-8">
           {session.user.image && (
             <img
               src={session.user.image}
