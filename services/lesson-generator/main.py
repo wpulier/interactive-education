@@ -16,7 +16,10 @@ from pipeline import run_pipeline
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"[WARNING] init_db failed: {e}")
     yield
 
 
