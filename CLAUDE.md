@@ -26,8 +26,10 @@ Subject → Section → Concept → Lesson
 ```
 
 - **Subject** = top-level discipline (Music Theory, Biology, etc.)
-- **Section** = topic area within a subject (Rhythm, Melody, etc.)
-- **Concept** = individual lesson topic (Time Signatures, Note Values, etc.)
+- **Section** = either a concept area (`type: "concepts"`) or a foundational work (`type: "work"`)
+  - Concept sections: standalone topics (Rhythm, Melody, Cell Biology)
+  - Work sections: organized around a specific text (Origin of Species, Principia, Wealth of Nations) — includes `meta` with author/year
+- **Concept** = individual lesson topic or chapter within a work
 - **Lesson** = the interactive page for a concept
 
 ## Critical Rules
@@ -35,7 +37,8 @@ Subject → Section → Concept → Lesson
 ### 1. Every new lesson MUST update the registry
 
 - New **subject**: add entry to `src/registry.ts` + create `src/subjects/[slug]/curriculum.ts`
-- New **section/concept**: update the subject's `curriculum.ts` in `src/subjects/[subject-slug]/`
+- New **section** (concept or work): update the subject's `curriculum.ts` — always specify `type` and `meta` for works
+- New **concept/chapter**: add to the section's `concepts` array in the subject's `curriculum.ts`
 - New **lesson component**: create at `src/subjects/[subject]/lessons/[section]/[concept]/index.tsx`
 
 ### 2. Subjects are compartmentalized

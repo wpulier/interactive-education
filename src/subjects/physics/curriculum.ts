@@ -4,17 +4,15 @@ export type { Section, Concept };
 
 export const sections: Section[] = [
   {
-    slug: "rhythm",
-    title: "Rhythm",
-    description: "How music is organized in time.",
-    type: "concepts",
-    concepts: [
-      {
-        slug: "time-signatures",
-        title: "Time Signatures",
-        description: "How beats are grouped into measures.",
-      },
-    ],
+    slug: "principia",
+    title: "Principia",
+    description: "The mathematical principles of natural philosophy.",
+    type: "work",
+    meta: {
+      author: "Isaac Newton",
+      year: 1687,
+    },
+    concepts: [],
   },
 ];
 

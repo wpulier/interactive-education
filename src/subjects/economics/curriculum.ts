@@ -4,17 +4,26 @@ export type { Section, Concept };
 
 export const sections: Section[] = [
   {
-    slug: "rhythm",
-    title: "Rhythm",
-    description: "How music is organized in time.",
-    type: "concepts",
-    concepts: [
-      {
-        slug: "time-signatures",
-        title: "Time Signatures",
-        description: "How beats are grouped into measures.",
-      },
-    ],
+    slug: "wealth-of-nations",
+    title: "The Wealth of Nations",
+    description: "An inquiry into the nature and causes of the wealth of nations.",
+    type: "work",
+    meta: {
+      author: "Adam Smith",
+      year: 1776,
+    },
+    concepts: [],
+  },
+  {
+    slug: "general-theory",
+    title: "The General Theory of Employment, Interest, and Money",
+    description: "The case for government intervention in aggregate demand.",
+    type: "work",
+    meta: {
+      author: "John Maynard Keynes",
+      year: 1936,
+    },
+    concepts: [],
   },
 ];
 

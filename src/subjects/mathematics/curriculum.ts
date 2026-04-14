@@ -4,17 +4,15 @@ export type { Section, Concept };
 
 export const sections: Section[] = [
   {
-    slug: "rhythm",
-    title: "Rhythm",
-    description: "How music is organized in time.",
-    type: "concepts",
-    concepts: [
-      {
-        slug: "time-signatures",
-        title: "Time Signatures",
-        description: "How beats are grouped into measures.",
-      },
-    ],
+    slug: "principia-mathematica",
+    title: "Principia Mathematica",
+    description: "The foundations of mathematics through symbolic logic.",
+    type: "work",
+    meta: {
+      author: "Alfred North Whitehead & Bertrand Russell",
+      year: 1910,
+    },
+    concepts: [],
   },
 ];
 

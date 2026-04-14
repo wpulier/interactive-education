@@ -51,6 +51,12 @@ export default async function SectionPage({
       <h1 className="font-serif text-3xl mt-4 mb-1 tracking-tight">
         {section.title}
       </h1>
+      {section.type === "work" && section.meta && (
+        <p className="text-sm text-[var(--text3)] mb-2">
+          {section.meta.author}
+          {section.meta.year && `, ${section.meta.year}`}
+        </p>
+      )}
       <p className="text-[var(--text2)] mb-8">{section.description}</p>
 
       <ol className="space-y-3">
