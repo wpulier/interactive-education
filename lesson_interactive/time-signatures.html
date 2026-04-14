@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Signatures — An Interactive Lesson</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #FAF9F6;
+    --bg2: #F0EFEB;
+    --text: #1A1A18;
+    --text2: #6B6A65;
+    --text3: #9C9B96;
+    --accent: #2E6FBA;
+    --accent-light: #E6F0FB;
+    --accent-med: #85B7EB;
+    --border: rgba(0,0,0,0.1);
+    --serif: 'DM Serif Display', Georgia, serif;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1A1A18;
+      --bg2: #2A2A26;
+      --text: #E8E6E0;
+      --text2: #9C9B96;
+      --text3: #6B6A65;
+      --accent: #5B9AE0;
+      --accent-light: #1E3350;
+      --accent-med: #3A6FA0;
+      --border: rgba(255,255,255,0.1);
+    }
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 400;
+    line-height: 1.15;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    font-size: 1.05rem;
+    color: var(--text2);
+    margin-bottom: 2.5rem;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 400;
+    margin: 2.5rem 0 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  p { margin-bottom: 1rem; color: var(--text); font-size: 0.95rem; }
+  p.muted { color: var(--text2); }
+
+  .callout {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    font-size: 0.92rem;
+    color: var(--text);
+  }
+
+  .callout strong { font-weight: 600; }
+
+  /* ---- Metronome Section ---- */
+  .metro-card {
+    background: var(--bg2);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem;
+    margin: 2rem 0;
+  }
+
+  .sig-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+
+  .sig-btn {
+    padding: 7px 15px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: var(--sans);
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .sig-btn:hover { border-color: var(--accent); }
+  .sig-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .sig-header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 1rem; }
+
+  .sig-fraction {
+    font-family: var(--serif);
+    font-size: 2.6rem;
+    line-height: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 44px;
+  }
+  .sig-fraction .bar { width: 30px; height: 2px; background: var(--text); margin: 2px 0; }
+
+  .sig-info-title { font-size: 0.95rem; font-weight: 500; margin: 0; }
+  .sig-info-desc { font-size: 0.82rem; color: var(--text2); margin: 3px 0 0; }
+
+  .counter-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 0.75rem; }
+  .counter {
+    font-family: var(--serif);
+    font-size: 1.6rem;
+    min-width: 36px;
+    text-align: center;
+    color: var(--text3);
+    transition: color 0.06s, transform 0.06s;
+    display: inline-block;
+  }
+  .counter.on { color: var(--accent); transform: scale(1.25); }
+
+  .bar-el rect { transition: opacity 0.06s, transform 0.06s; transform-origin: center bottom; }
+  .bar-el.hit rect { opacity: 1 !important; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 1rem;
+  }
+  .controls label { font-size: 0.8rem; color: var(--text2); }
+
+  .play-btn {
+    padding: 8px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-family: var(--sans);
+    font-weight: 600;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .play-btn:hover { opacity: 0.88; }
+  .play-btn:active { transform: scale(0.97); }
+
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .legend {
+    display: flex; gap: 16px; margin-top: 1rem; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--text2); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text3);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Time signatures</h1>
+  <p class="subtitle">An interactive guide to how rhythm is organized in music.</p>
+
+  <h2>What is a time signature?</h2>
+  <p>A time signature is the pair of stacked numbers you see at the start of a piece of sheet music. It answers two questions: <strong>how many beats</strong> are in each measure, and <strong>what kind of note</strong> gets one beat.</p>
+
+  <div class="callout">
+    <strong>Top number</strong> = how many beats per measure.<br>
+    <strong>Bottom number</strong> = which note value equals one beat (4 = quarter note, 8 = eighth note).
+  </div>
+
+  <p>So <strong>3/4</strong> means "three quarter-note beats per measure" — that's waltz time. <strong>6/8</strong> means "six eighth-note beats," but those six are usually felt as two big groups of three, giving it a swaying, compound feel.</p>
+
+  <h2>Strong and weak beats</h2>
+  <p>Not all beats are created equal. The first beat of every measure (the <strong>downbeat</strong>) is the strongest — it's where your foot lands hardest. Other beats are weaker, creating a recurring pattern of emphasis that defines the groove. A march (2/4) feels completely different from a waltz (3/4) because their accent patterns differ, even at the same tempo.</p>
+
+  <h2>Try it yourself</h2>
+  <p class="muted">Pick a time signature, hit play, and listen to how the accent pattern changes. Adjust tempo to feel it at different speeds.</p>
+
+  <!-- ===== Interactive Metronome ===== -->
+  <div class="metro-card">
+    <div class="sig-row">
+      <button class="sig-btn active" onclick="pick(4,4)">4/4</button>
+      <button class="sig-btn" onclick="pick(3,4)">3/4</button>
+      <button class="sig-btn" onclick="pick(6,8)">6/8</button>
+      <button class="sig-btn" onclick="pick(2,4)">2/4</button>
+      <button class="sig-btn" onclick="pick(5,4)">5/4</button>
+      <button class="sig-btn" onclick="pick(7,8)">7/8</button>
+    </div>
+
+    <div class="sig-header">
+      <div class="sig-fraction">
+        <span id="st">4</span>
+        <span class="bar"></span>
+        <span id="sb">4</span>
+      </div>
+      <div>
+        <p class="sig-info-title" id="sm">4 quarter-note beats per measure</p>
+        <p class="sig-info-desc" id="sd">The default pulse of pop, rock, hip-hop, and most Western music.</p>
+      </div>
+    </div>
+
+    <div class="counter-row" id="counter-row"></div>
+
+    <svg id="grid" width="100%" viewBox="0 0 680 120" role="img">
+      <title>Beat visualization</title>
+      <desc>Vertical bars representing beat accents</desc>
+    </svg>
+
+    <div class="controls">
+      <button class="play-btn" id="pbtn" onclick="toggle()">Play</button>
+      <label>Tempo</label>
+      <input type="range" min="60" max="180" value="100" step="1" id="bpm" oninput="document.getElementById('bpmv').textContent=this.value">
+      <span id="bpmv" style="font-size:0.85rem;min-width:28px;text-align:right">100</span>
+      <label>bpm</label>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:#2E6FBA"></span> Strong (downbeat)</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#85B7EB"></span> Medium</div>
+      <div class="legend-item"><span class="legend-dot" style="background:#C4C3BE"></span> Weak</div>
+    </div>
+  </div>
+
+  <h2>Common time signatures</h2>
+
+  <p><strong>4/4 — "common time"</strong><br>Four quarter-note beats. The backbone of rock, pop, funk, hip-hop, electronic, and most Western music. If you're tapping your foot to a song, odds are it's in 4/4.</p>
+
+  <p><strong>3/4 — waltz time</strong><br>Three quarter-note beats: ONE-two-three, ONE-two-three. This gives music a lilting, dance-like sway. Think waltzes, many folk songs, and ballads.</p>
+
+  <p><strong>6/8 — compound duple</strong><br>Six eighth notes grouped in two sets of three. It feels like two big beats, each subdivided into three — creating a rolling, swaying quality. Common in Irish jigs, blues, and ballads.</p>
+
+  <p><strong>2/4 — march time</strong><br>Two quarter-note beats: LEFT-right, LEFT-right. Simple, driving, and forward-moving. Polkas and marches live here.</p>
+
+  <h2>Odd meters</h2>
+  <p>Once you leave the comfort of 2, 3, and 4, things get interesting. Odd time signatures like 5/4 and 7/8 divide beats into asymmetric groups — creating grooves that feel slightly "off" in the best way.</p>
+
+  <p><strong>5/4</strong> is usually felt as 3+2 or 2+3. Dave Brubeck's "Take Five" is the classic example — that distinctive, swinging-but-uneven groove.</p>
+
+  <p><strong>7/8</strong> is often grouped 2+2+3 or 3+2+2. It shows up throughout Balkan folk music, progressive rock, and film scores. Once you start hearing it, you'll notice it everywhere.</p>
+
+  <div class="callout">
+    <strong>The bottom line:</strong> A time signature is just a way of telling musicians how to count. The top number says how high to count, the bottom number says what you're counting. Everything else — the groove, the feel, the swing — comes from how musicians interpret that pattern.
+  </div>
+
+  <div class="footer">
+    Made as an interactive lesson. Open in any browser — no internet needed.
+  </div>
+
+</div>
+
+<script>
+const D={
+  '4/4':{m:'4 quarter-note beats per measure',d:'The default pulse of pop, rock, hip-hop, and most Western music.',a:[3,1,2,1],g:[4]},
+  '3/4':{m:'3 quarter-note beats per measure',d:'Waltz time — a lilting ONE-two-three cycle.',a:[3,1,1],g:[3]},
+  '6/8':{m:'6 eighth-note beats per measure',d:'Compound duple — feels like 2 big swaying beats, each split into 3.',a:[3,1,1,2,1,1],g:[3,3]},
+  '2/4':{m:'2 quarter-note beats per measure',d:'March time — LEFT-right, LEFT-right.',a:[3,1],g:[2]},
+  '5/4':{m:'5 quarter-note beats per measure',d:'Odd meter, usually 3+2. Think "Take Five" by Dave Brubeck.',a:[3,1,1,2,1],g:[3,2]},
+  '7/8':{m:'7 eighth-note beats per measure',d:'Asymmetric groove (2+2+3) — Balkan folk, prog rock.',a:[3,1,2,1,3,1,1],g:[2,2,3]}
+};
+let T=4,B=4,on=false,tmr=null,cur=0,ctx=null;
+
+function mkCtx(){
+  if(!ctx){try{ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){ctx=null}}
+  if(ctx&&ctx.state==='suspended')ctx.resume();
+}
+
+function beep(acc){
+  if(!ctx)return;
+  try{
+    const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine';
+    o.frequency.value=acc===3?1200:acc===2?900:660;
+    g.gain.value=acc===3?0.6:acc===2?0.35:0.18;
+    o.connect(g);g.connect(ctx.destination);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.06);
+    o.start(t);o.stop(t+0.06);
+  }catch(e){}
+}
+
+function draw(){
+  const s=D[`${T}/${B}`],n=T,mes=2,tot=n*mes;
+  const usable=636,mg=24,iw=(usable-(mes-1)*mg)/mes,bw=iw/n,gp=4;
+  let h='',x=22;
+  const strong='#2E6FBA',med='#85B7EB',weak='#C4C3BE';
+  for(let m=0;m<mes;m++){
+    let gi=0,gc=0;
+    for(let i=0;i<n;i++){
+      const idx=m*n+i,a=s.a[i];
+      const col=a===3?strong:a===2?med:weak;
+      const bh=a===3?76:a===2?56:40,y=96-bh;
+      h+=`<g class="bar-el" data-i="${idx}"><rect x="${x}" y="${y}" width="${bw-gp}" height="${bh}" rx="4" fill="${col}" opacity="0.5"/><text x="${x+(bw-gp)/2}" y="${110}" text-anchor="middle" style="font-size:11px;fill:var(--text2,#6B6A65)">${i+1}</text></g>`;
+      gc++;
+      if(gc>=s.g[gi]&&gi<s.g.length-1){x+=bw+3;gi++;gc=0}else{x+=bw}
+    }
+    if(m<mes-1){h+=`<line x1="${x+4}" y1="10" x2="${x+4}" y2="96" stroke="var(--text3,#9C9B96)" stroke-width="1.5" opacity="0.3"/>`;x+=mg}
+  }
+  document.getElementById('grid').innerHTML=h;
+  let cr='';
+  for(let i=0;i<n;i++) cr+=`<span class="counter" id="c${i}">${i+1}</span>`;
+  document.getElementById('counter-row').innerHTML=cr;
+}
+
+function hi(idx){
+  document.querySelectorAll('#grid .bar-el').forEach((g,i)=>{
+    const r=g.querySelector('rect');
+    if(i===idx){g.classList.add('hit');r.style.opacity='1'}
+    else{g.classList.remove('hit');r.style.opacity='0.5'}
+  });
+  const bim=idx%T;
+  document.querySelectorAll('.counter').forEach((s,i)=>{
+    if(i===bim){s.classList.add('on')}else{s.classList.remove('on')}
+  });
+}
+
+function pick(t,b){
+  T=t;B=b;
+  document.querySelectorAll('.sig-btn').forEach(btn=>btn.classList.toggle('active',btn.textContent===`${t}/${b}`));
+  document.getElementById('st').textContent=t;
+  document.getElementById('sb').textContent=b;
+  const s=D[`${t}/${b}`];
+  document.getElementById('sm').textContent=s.m;
+  document.getElementById('sd').textContent=s.d;
+  if(on)stop();
+  draw();
+}
+
+function toggle(){on?stop():start()}
+function start(){
+  mkCtx();
+  on=true;
+  document.getElementById('pbtn').textContent='Stop';
+  cur=0;
+  tick();
+}
+function stop(){
+  on=false;
+  document.getElementById('pbtn').textContent='Play';
+  clearTimeout(tmr);
+  document.querySelectorAll('#grid .bar-el').forEach(g=>{g.classList.remove('hit');g.querySelector('rect').style.opacity='0.5'});
+  document.querySelectorAll('.counter').forEach(s=>s.classList.remove('on'));
+}
+function tick(){
+  if(!on)return;
+  const s=D[`${T}/${B}`],tot=T*2,bim=cur%T,acc=s.a[bim];
+  hi(cur%tot);
+  beep(acc);
+  const bpm=parseInt(document.getElementById('bpm').value);
+  const ms=B===8?60000/bpm/1.5:60000/bpm;
+  cur=(cur+1)%tot;
+  tmr=setTimeout(tick,ms);
+}
+
+draw();
+</script>
+</body>
+</html>
