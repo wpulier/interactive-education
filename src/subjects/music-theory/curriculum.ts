@@ -1,17 +1,8 @@
-export type Concept = {
-  slug: string;
-  title: string;
-  description: string;
-};
+import type { Section, Concept } from "@/types";
 
-export type Section = {
-  slug: string;
-  title: string;
-  description: string;
-  concepts: Concept[];
-};
+export type { Section, Concept };
 
-export const curriculum: Section[] = [
+export const sections: Section[] = [
   {
     slug: "rhythm",
     title: "Rhythm",
@@ -27,7 +18,7 @@ export const curriculum: Section[] = [
 ];
 
 export function getSection(slug: string): Section | undefined {
-  return curriculum.find((s) => s.slug === slug);
+  return sections.find((s) => s.slug === slug);
 }
 
 export function getConcept(

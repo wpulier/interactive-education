@@ -16,8 +16,8 @@ const serif = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Music Education",
-  description: "Interactive music theory lessons",
+  title: "Interactive Education",
+  description: "Interactive lessons across subjects",
 };
 
 export default function RootLayout({

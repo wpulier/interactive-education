@@ -248,7 +248,7 @@ export default function TimeSignaturesLesson() {
     <div className="max-w-[720px] mx-auto px-6 py-12">
       {/* Back link */}
       <Link
-        href="/rhythm"
+        href="/music-theory/rhythm"
         className="text-sm hover:text-[var(--accent)] transition-colors"
         style={{ color: "var(--text3)" }}
       >
