@@ -17,6 +17,8 @@ class Source(Base):
     title = Column(String(500))
     content = Column(Text, nullable=False)
     original_url = Column(String(2000))
+    author = Column(String(500), nullable=True)
+    publication = Column(String(500), nullable=True)
     metadata_ = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

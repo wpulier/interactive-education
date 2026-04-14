@@ -10,9 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Source, Curriculum, Lesson, Job
 from ingestion import ingest_text, ingest_url, ingest_pdf
-from prompts import DECOMPOSE_SYSTEM, DECOMPOSE_USER, GENERATE_SYSTEM, GENERATE_USER
+from prompts import (
+    DECOMPOSE_SYSTEM, DECOMPOSE_USER,
+    GENERATE_SYSTEM, GENERATE_USER,
+    GENERATE_OVERVIEW_USER,
+)
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+client = anthropic.AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
 MODEL = "claude-sonnet-4-20250514"
 
@@ -26,6 +30,9 @@ async def run_pipeline(
     file_bytes: bytes | None = None,
     user_id: str | None = None,
     user_name: str | None = None,
+    source_title: str | None = None,
+    source_author: str | None = None,
+    source_publication: str | None = None,
 ):
     """Run the full generation pipeline for a job."""
     job = await db.get(Job, job_id)
@@ -39,25 +46,33 @@ async def run_pipeline(
         await db.commit()
 
         if source_type == "text":
-            extracted = await ingest_text(content)
+            result = await ingest_text(content)
         elif source_type == "url":
-            extracted = await ingest_url(content)
+            result = await ingest_url(content)
         elif source_type == "pdf":
             if not file_bytes:
                 raise ValueError("PDF source requires file_bytes")
-            extracted = await ingest_pdf(file_bytes)
+            result = await ingest_pdf(file_bytes)
         else:
             raise ValueError(f"Unknown source type: {source_type}")
+
+        extracted = result.text
 
         if not extracted or len(extracted.strip()) < 50:
             raise ValueError("Extracted content is too short to generate lessons from")
 
+        # Use auto-detected title as fallback for URL sources
+        if not source_title and result.extracted_title:
+            source_title = result.extracted_title
+
         # Save source
         source = Source(
             type=source_type,
-            title=content[:200] if source_type == "text" else content,
+            title=source_title or (content[:200] if source_type == "text" else content),
             content=extracted,
             original_url=content if source_type == "url" else None,
+            author=source_author,
+            publication=source_publication,
         )
         db.add(source)
         await db.flush()
@@ -72,7 +87,7 @@ async def run_pipeline(
         # Truncate content for decomposition if very long
         decompose_content = extracted[:30000] if len(extracted) > 30000 else extracted
 
-        decompose_response = client.messages.create(
+        decompose_response = await client.messages.create(
             model=MODEL,
             max_tokens=4096,
             system=DECOMPOSE_SYSTEM,
@@ -102,20 +117,90 @@ async def run_pipeline(
         concepts = structure.get("concepts", [])
         total = len(concepts)
 
-        # 3. GENERATE — one lesson per concept
+        # Source attribution context for prompt injection
+        source_attr = {
+            "source_type": source_type,
+            "source_title": source.title or "",
+            "source_author": source.author or "",
+            "source_url": source.original_url or "",
+        }
+
+        # 3. GENERATE — overview FIRST, then one lesson per concept
+
+        # 3a. Overview lesson (generated first since students see it first)
+        job.progress = {
+            "stage": "generating",
+            "detail": "Creating overview lesson",
+            "current": 1,
+            "total": total + 1,
+        }
+        await db.commit()
+
+        overview_excerpt = extracted[:5000]
+        overview_response = await client.messages.create(
+            model=MODEL,
+            max_tokens=8192,
+            system=GENERATE_SYSTEM,
+            messages=[
+                {
+                    "role": "user",
+                    "content": GENERATE_OVERVIEW_USER.format(
+                        section_title=structure.get("title", "Overview"),
+                        section_description=structure.get("description", ""),
+                        concept_list=", ".join(c["title"] for c in concepts),
+                        source_excerpt=overview_excerpt,
+                        **source_attr,
+                    ),
+                }
+            ],
+        )
+
+        overview_code = _clean_code(overview_response.content[0].text.strip())
+
+        # Validate overview code
+        valid, err = _validate_lesson(overview_code)
+        if not valid:
+            overview_code = await _retry_generation(
+                GENERATE_SYSTEM,
+                GENERATE_OVERVIEW_USER.format(
+                    section_title=structure.get("title", "Overview"),
+                    section_description=structure.get("description", ""),
+                    concept_list=", ".join(c["title"] for c in concepts),
+                    source_excerpt=overview_excerpt,
+                    **source_attr,
+                ),
+                err,
+            )
+
+        overview_lesson = Lesson(
+            curriculum_id=curriculum.id,
+            subject_slug=subject_slug,
+            section_slug=structure.get("slug", "generated"),
+            concept_slug="overview",
+            title="Overview",
+            description=f"Introduction to {structure.get('title', 'this section')}",
+            code=overview_code,
+            source_excerpt=overview_excerpt,
+            user_id=user_id,
+            user_name=user_name,
+        )
+        db.add(overview_lesson)
+        await db.flush()
+
+        # 3b. Concept lessons
         for i, concept in enumerate(concepts):
             job.progress = {
                 "stage": "generating",
                 "detail": f"Creating lesson {i + 1}/{total}: {concept['title']}",
-                "current": i + 1,
-                "total": total,
+                "current": i + 2,  # +2 because overview is 1
+                "total": total + 1,
             }
             await db.commit()
 
             # Find relevant source excerpt for this concept
             source_excerpt = _extract_relevant_excerpt(extracted, concept["title"], concept.get("description", ""))
 
-            generate_response = client.messages.create(
+            generate_response = await client.messages.create(
                 model=MODEL,
                 max_tokens=8192,
                 system=GENERATE_SYSTEM,
@@ -128,16 +213,29 @@ async def run_pipeline(
                             section_title=structure.get("title", ""),
                             section_description=structure.get("description", ""),
                             source_excerpt=source_excerpt[:8000],
+                            **source_attr,
                         ),
                     }
                 ],
             )
 
-            code = generate_response.content[0].text.strip()
-            # Clean markdown fences if present
-            if code.startswith("```"):
-                code = re.sub(r"^```\w*\n?", "", code)
-                code = re.sub(r"\n?```$", "", code)
+            code = _clean_code(generate_response.content[0].text.strip())
+
+            # Validate and retry once on failure
+            valid, err = _validate_lesson(code)
+            if not valid:
+                code = await _retry_generation(
+                    GENERATE_SYSTEM,
+                    GENERATE_USER.format(
+                        title=concept["title"],
+                        description=concept.get("description", ""),
+                        section_title=structure.get("title", ""),
+                        section_description=structure.get("description", ""),
+                        source_excerpt=source_excerpt[:8000],
+                        **source_attr,
+                    ),
+                    err,
+                )
 
             lesson = Lesson(
                 curriculum_id=curriculum.id,
@@ -154,54 +252,6 @@ async def run_pipeline(
             db.add(lesson)
             await db.flush()
 
-        # Also generate an overview lesson
-        job.progress = {
-            "stage": "generating",
-            "detail": "Creating overview lesson",
-            "current": total + 1,
-            "total": total + 1,
-        }
-        await db.commit()
-
-        overview_response = client.messages.create(
-            model=MODEL,
-            max_tokens=8192,
-            system=GENERATE_SYSTEM,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Create an overview/introduction lesson for a section called "{structure.get('title', 'Overview')}".
-
-DESCRIPTION: {structure.get('description', '')}
-
-This is the first lesson a student will see when entering this section. It should:
-- Define and explain the core topic
-- Explain why it matters
-- Preview what the student will learn in the upcoming lessons: {', '.join(c['title'] for c in concepts)}
-- Include at least one interactive element that gives a taste of the subject
-
-Make it engaging and set the stage for the deeper lessons that follow.""",
-                }
-            ],
-        )
-
-        overview_code = overview_response.content[0].text.strip()
-        if overview_code.startswith("```"):
-            overview_code = re.sub(r"^```\w*\n?", "", overview_code)
-            overview_code = re.sub(r"\n?```$", "", overview_code)
-
-        overview_lesson = Lesson(
-            curriculum_id=curriculum.id,
-            subject_slug=subject_slug,
-            section_slug=structure.get("slug", "generated"),
-            concept_slug="overview",
-            title="Overview",
-            description=f"Introduction to {structure.get('title', 'this section')}",
-            code=overview_code,
-            user_id=user_id,
-            user_name=user_name,
-        )
-        db.add(overview_lesson)
         await db.commit()
 
         # 4. COMPLETE
@@ -222,30 +272,98 @@ Make it engaging and set the stage for the deeper lessons that follow.""",
         raise
 
 
+def _clean_code(code: str) -> str:
+    """Strip markdown fences from generated code."""
+    if code.startswith("```"):
+        code = re.sub(r"^```\w*\n?", "", code)
+        code = re.sub(r"\n?```\s*$", "", code)
+    return code
+
+
+def _validate_lesson(code: str) -> tuple[bool, str]:
+    """Basic validation of a generated HTML lesson artifact."""
+    if "<!DOCTYPE" not in code and "<html" not in code:
+        return False, "Missing HTML document structure — output must be a complete HTML file"
+
+    if "<div id=\"root\">" not in code and "<div id='root'>" not in code:
+        return False, "Missing <div id='root'> mount point"
+
+    if "ReactDOM" not in code:
+        return False, "Missing ReactDOM render call"
+
+    if 'type="text/babel"' not in code and "type='text/babel'" not in code:
+        return False, "Missing script type='text/babel' — JSX requires Babel"
+
+    return True, "OK"
+
+
+async def _retry_generation(system: str, user_content: str, error: str) -> str:
+    """Retry a failed generation once with the error message appended."""
+    retry_response = await client.messages.create(
+        model=MODEL,
+        max_tokens=8192,
+        system=system,
+        messages=[
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": "I'll fix the issue and regenerate."},
+            {
+                "role": "user",
+                "content": f"Your previous output had a validation error: {error}. "
+                "Please regenerate the complete component, fixing that issue.",
+            },
+        ],
+    )
+    return _clean_code(retry_response.content[0].text.strip())
+
+
 def _extract_relevant_excerpt(full_text: str, title: str, description: str) -> str:
     """Extract the most relevant portion of source text for a concept.
 
-    Simple heuristic: search for the title in the text and take surrounding context.
-    Falls back to the beginning of the text if title not found.
+    Uses keyword-density scoring across chunks to find the best match.
     """
-    title_lower = title.lower()
     text_lower = full_text.lower()
 
-    # Try to find the title in the text
-    idx = text_lower.find(title_lower)
-    if idx == -1:
-        # Try first significant word of the title
-        words = [w for w in title_lower.split() if len(w) > 3]
-        for word in words:
-            idx = text_lower.find(word)
-            if idx != -1:
-                break
-
+    # Strategy 1: exact title match
+    idx = text_lower.find(title.lower())
     if idx != -1:
-        # Take ~3000 chars around the match
         start = max(0, idx - 500)
-        end = min(len(full_text), idx + 2500)
+        end = min(len(full_text), idx + 4500)
         return full_text[start:end]
 
-    # Fallback: return first chunk
-    return full_text[:3000]
+    # Strategy 2: keyword density scoring over chunks
+    keywords = set()
+    for text in [title, description]:
+        for word in text.lower().split():
+            cleaned = re.sub(r"[^a-z]", "", word)
+            if len(cleaned) > 3:
+                keywords.add(cleaned)
+
+    if not keywords:
+        return full_text[:5000]
+
+    # Score ~500-char chunks by keyword overlap
+    chunk_size = 500
+    overlap = 100
+    best_score = 0
+    best_start = 0
+
+    for i in range(0, len(full_text), chunk_size - overlap):
+        chunk_lower = full_text[i : i + chunk_size].lower()
+        score = sum(1 for kw in keywords if kw in chunk_lower)
+        if score > best_score:
+            best_score = score
+            best_start = i
+
+    if best_score > 0:
+        start = max(0, best_start - 500)
+        end = min(len(full_text), best_start + 4500)
+        return full_text[start:end]
+
+    # Strategy 3: skip probable front matter, take first substantive content
+    paragraphs = full_text.split("\n\n")
+    content_start = 0
+    for para in paragraphs:
+        if len(para.strip()) > 100:
+            content_start = full_text.find(para)
+            break
+    return full_text[content_start : content_start + 5000]

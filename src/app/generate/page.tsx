@@ -10,6 +10,16 @@ type SourceType = "text" | "url" | "pdf";
 export default function GeneratePage() {
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
+  const [sourceType, setSourceType] = useState<SourceType>("text");
+  const [content, setContent] = useState("");
+  const [subjectSlug, setSubjectSlug] = useState("community");
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showAttribution, setShowAttribution] = useState(false);
+  const [sourceTitle, setSourceTitle] = useState("");
+  const [sourceAuthor, setSourceAuthor] = useState("");
+  const [sourcePublication, setSourcePublication] = useState("");
 
   if (authStatus === "loading") {
     return (
@@ -43,12 +53,6 @@ export default function GeneratePage() {
       </div>
     );
   }
-  const [sourceType, setSourceType] = useState<SourceType>("text");
-  const [content, setContent] = useState("");
-  const [subjectSlug, setSubjectSlug] = useState("community");
-  const [file, setFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setError(null);
@@ -72,6 +76,9 @@ export default function GeneratePage() {
           source_type: sourceType,
           content: content.trim(),
           subject_slug: subjectSlug,
+          ...(sourceTitle && { source_title: sourceTitle }),
+          ...(sourceAuthor && { source_author: sourceAuthor }),
+          ...(sourcePublication && { source_publication: sourcePublication }),
         });
       }
 
@@ -180,6 +187,88 @@ export default function GeneratePage() {
                   color: "var(--text)",
                 }}
               />
+            </div>
+
+            {/* Source attribution (optional) */}
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setShowAttribution(!showAttribution)}
+                className="flex items-center gap-2 text-sm cursor-pointer bg-transparent border-none p-0"
+                style={{ color: "var(--text2)" }}
+              >
+                <svg
+                  width="12" height="12" viewBox="0 0 12 12"
+                  style={{
+                    transform: showAttribution ? "rotate(90deg)" : "rotate(0deg)",
+                    transition: "transform 0.15s",
+                  }}
+                >
+                  <path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+                Source attribution (optional)
+              </button>
+
+              {showAttribution && (
+                <div className="mt-3 space-y-3">
+                  {sourceType === "url" && (
+                    <p className="text-xs" style={{ color: "var(--text3)" }}>
+                      We&apos;ll auto-detect the page title if you leave it blank.
+                    </p>
+                  )}
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: "var(--text3)" }}>
+                      Title
+                    </label>
+                    <input
+                      type="text"
+                      value={sourceTitle}
+                      onChange={(e) => setSourceTitle(e.target.value)}
+                      placeholder="Title of the article, book, or document"
+                      className="w-full p-3 rounded-lg border text-sm"
+                      style={{
+                        background: "var(--bg2)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: "var(--text3)" }}>
+                      Author
+                    </label>
+                    <input
+                      type="text"
+                      value={sourceAuthor}
+                      onChange={(e) => setSourceAuthor(e.target.value)}
+                      placeholder="Author name"
+                      className="w-full p-3 rounded-lg border text-sm"
+                      style={{
+                        background: "var(--bg2)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: "var(--text3)" }}>
+                      Publication
+                    </label>
+                    <input
+                      type="text"
+                      value={sourcePublication}
+                      onChange={(e) => setSourcePublication(e.target.value)}
+                      placeholder="Website, journal, or publisher"
+                      className="w-full p-3 rounded-lg border text-sm"
+                      style={{
+                        background: "var(--bg2)",
+                        borderColor: "var(--border)",
+                        color: "var(--text)",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && (

@@ -7,26 +7,92 @@ interface DynamicLessonProps {
   code: string;
 }
 
-export default function DynamicLesson({ code }: DynamicLessonProps) {
+/**
+ * Detects whether lesson code is a self-contained HTML artifact or legacy TSX.
+ */
+function isHtmlArtifact(code: string): boolean {
+  const trimmed = code.trimStart();
+  return trimmed.startsWith("<!DOCTYPE") || trimmed.startsWith("<html") || trimmed.startsWith("<!doctype");
+}
+
+/**
+ * Renders an HTML artifact in a sandboxed iframe with auto-resize.
+ */
+function HtmlArtifactRenderer({ code }: { code: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(600);
+
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === "lesson-resize" && typeof e.data.height === "number") {
+        setHeight(e.data.height);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Inject resize observer script into the HTML if not already present
+  const htmlWithResize = useMemo(() => {
+    if (code.includes("lesson-resize")) return code;
+    const resizeScript = `
+<script>
+(function() {
+  function postHeight() {
+    var h = document.documentElement.scrollHeight;
+    window.parent.postMessage({ type: 'lesson-resize', height: h }, '*');
+  }
+  new ResizeObserver(postHeight).observe(document.body);
+  window.addEventListener('load', function() { setTimeout(postHeight, 100); });
+  postHeight();
+})();
+</script>`;
+    // Insert before </body> or at end
+    if (code.includes("</body>")) {
+      return code.replace("</body>", resizeScript + "</body>");
+    }
+    return code + resizeScript;
+  }, [code]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={htmlWithResize}
+      sandbox="allow-scripts allow-same-origin"
+      style={{
+        width: "100%",
+        height: `${height}px`,
+        border: "none",
+        overflow: "hidden",
+        display: "block",
+      }}
+      title="Lesson content"
+    />
+  );
+}
+
+/**
+ * Legacy renderer for TSX lessons stored before the HTML artifact format.
+ * Uses Sucrase to compile TSX at runtime.
+ */
+function LegacyTsxRenderer({ code }: { code: string }) {
   const [error, setError] = useState<string | null>(null);
 
   const Component = useMemo(() => {
     try {
-      // Strip "use client" directive — it's not valid in runtime eval
+      // Strip "use client" directive
       let cleanCode = code.replace(/^"use client";\s*/m, "").replace(/^'use client';\s*/m, "");
 
-      // Remove import statements — we inject React as a global
+      // Strip import statements BEFORE Sucrase — we inject globals manually
       cleanCode = cleanCode.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, "");
 
-      // Transform TSX → JS
+      // Transform TSX → CJS JS
       const result = transform(cleanCode, {
-        transforms: ["typescript", "jsx"],
+        transforms: ["typescript", "jsx", "imports"],
         jsxRuntime: "classic",
         production: true,
       });
 
-      // Create a function that returns the component
-      // Provide React and all hooks in scope
       const fn = new Function(
         "React",
         "useState",
@@ -34,32 +100,22 @@ export default function DynamicLesson({ code }: DynamicLessonProps) {
         "useCallback",
         "useEffect",
         "useMemo",
-        `${result.code}
-
-        // Find the default export
-        // The transformed code should have a function declaration or assignment
-        // Try to find and return it
-        const __exports = {};
-        try {
-          // Look for "export default function X" → becomes "function X"
-          const match = ${JSON.stringify(result.code)}.match(/^(?:export\\s+default\\s+)?function\\s+(\\w+)/m);
-          if (match && typeof eval(match[1]) === 'function') {
-            return eval(match[1]);
-          }
-        } catch {}
-        return null;`
+        `var exports = {}; var module = { exports: exports };
+        ${result.code}
+        return exports.default || module.exports.default || module.exports;`
       );
 
       const Comp = fn(React, useState, useRef, useCallback, useEffect, useMemo);
-      if (!Comp) {
+      if (!Comp || typeof Comp !== "function") {
         setError("Could not find a component to render");
         return null;
       }
 
       setError(null);
       return Comp;
-    } catch (e: any) {
-      setError(e.message || "Failed to compile lesson");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to compile lesson";
+      setError(msg);
       return null;
     }
   }, [code]);
@@ -94,4 +150,11 @@ export default function DynamicLesson({ code }: DynamicLessonProps) {
   }
 
   return <Component />;
+}
+
+export default function DynamicLesson({ code }: DynamicLessonProps) {
+  if (isHtmlArtifact(code)) {
+    return <HtmlArtifactRenderer code={code} />;
+  }
+  return <LegacyTsxRenderer code={code} />;
 }

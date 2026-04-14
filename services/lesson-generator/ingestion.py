@@ -1,23 +1,34 @@
 """Source material ingestion — extract text from various input types."""
 
+from dataclasses import dataclass
+
 import httpx
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfReader
 from io import BytesIO
 
 
-async def ingest_text(content: str) -> str:
+@dataclass
+class IngestResult:
+    text: str
+    extracted_title: str | None = None
+
+
+async def ingest_text(content: str) -> IngestResult:
     """Pass through raw text."""
-    return content.strip()
+    return IngestResult(text=content.strip())
 
 
-async def ingest_url(url: str) -> str:
+async def ingest_url(url: str) -> IngestResult:
     """Fetch a URL and extract readable text content."""
     async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
         response = await client.get(url)
         response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
+
+    # Extract page title before stripping tags
+    extracted_title = soup.title.string.strip() if soup.title and soup.title.string else None
 
     # Remove script, style, nav, footer elements
     for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
@@ -30,10 +41,10 @@ async def ingest_url(url: str) -> str:
 
     # Extract text with paragraph separation
     text = main.get_text(separator="\n\n", strip=True)
-    return text
+    return IngestResult(text=text, extracted_title=extracted_title)
 
 
-async def ingest_pdf(file_bytes: bytes) -> str:
+async def ingest_pdf(file_bytes: bytes) -> IngestResult:
     """Extract text from a PDF file."""
     reader = PdfReader(BytesIO(file_bytes))
     pages = []
@@ -41,4 +52,4 @@ async def ingest_pdf(file_bytes: bytes) -> str:
         text = page.extract_text()
         if text:
             pages.append(text.strip())
-    return "\n\n".join(pages)
+    return IngestResult(text="\n\n".join(pages))

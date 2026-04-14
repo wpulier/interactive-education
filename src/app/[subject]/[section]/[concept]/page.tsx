@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { subjects } from "@/registry";
 import { getLessons } from "@/lib/api";
 import DynamicLesson from "@/components/dynamic-lesson";
+import SourceAttribution from "@/components/source-attribution";
 import type { Section } from "@/types";
 
 export async function generateStaticParams() {
@@ -92,6 +93,7 @@ export default async function LessonPage({
             </div>
           )}
           <DynamicLesson code={lesson.code} />
+          <SourceAttribution lesson={lesson} />
         </div>
       );
     }
