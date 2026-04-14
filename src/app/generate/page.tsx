@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { startGeneration, startPdfGeneration, getJobStatus, type JobStatus } from "@/lib/api";
+import { startGeneration, startPdfGeneration } from "@/lib/api";
 
 type SourceType = "text" | "url" | "pdf";
 
 export default function GeneratePage() {
   const { data: session, status: authStatus } = useSession();
+  const router = useRouter();
 
   if (authStatus === "loading") {
     return (
@@ -46,65 +48,40 @@ export default function GeneratePage() {
   const [content, setContent] = useState("");
   const [subjectSlug, setSubjectSlug] = useState("community");
   const [file, setFile] = useState<File | null>(null);
-  const [job, setJob] = useState<JobStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleSubmit = async () => {
     setError(null);
     setSubmitting(true);
 
     try {
-      let result: { job_id: string };
-
       if (sourceType === "pdf") {
         if (!file) {
           setError("Please select a PDF file");
           setSubmitting(false);
           return;
         }
-        result = await startPdfGeneration(file, subjectSlug);
+        await startPdfGeneration(file, subjectSlug);
       } else {
         if (!content.trim()) {
           setError("Please enter content");
           setSubmitting(false);
           return;
         }
-        result = await startGeneration({
+        await startGeneration({
           source_type: sourceType,
           content: content.trim(),
           subject_slug: subjectSlug,
         });
       }
 
-      setJob({ job_id: result.job_id, status: "pending", progress: { stage: "queued" } });
-
-      // Poll for status
-      pollRef.current = setInterval(async () => {
-        try {
-          const status = await getJobStatus(result.job_id);
-          setJob(status);
-          if (status.status === "complete" || status.status === "failed") {
-            if (pollRef.current) clearInterval(pollRef.current);
-          }
-        } catch {
-          // Keep polling on network errors
-        }
-      }, 2000);
+      // Redirect to profile to track progress
+      router.push("/profile");
     } catch (e: any) {
       setError(e.message || "Failed to start generation");
-    } finally {
       setSubmitting(false);
     }
-  };
-
-  const resetForm = () => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    setJob(null);
-    setContent("");
-    setFile(null);
-    setError(null);
   };
 
   return (
@@ -127,9 +104,8 @@ export default function GeneratePage() {
           Turn any source material into interactive lessons.
         </p>
 
-        {!job ? (
+        {/* Source type selector */}
           <>
-            {/* Source type selector */}
             <div className="flex gap-2 mb-6">
               {(["text", "url", "pdf"] as SourceType[]).map((type) => (
                 <button
@@ -230,102 +206,6 @@ export default function GeneratePage() {
               {submitting ? "Starting..." : "Generate Lessons"}
             </button>
           </>
-        ) : (
-          /* Job status */
-          <div className="rounded-2xl p-8" style={{ background: "var(--bg2)" }}>
-            <div className="flex items-center justify-between mb-4">
-              <h2
-                className="text-xl"
-                style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
-              >
-                {job.status === "complete"
-                  ? "Lessons Generated"
-                  : job.status === "failed"
-                  ? "Generation Failed"
-                  : "Generating..."}
-              </h2>
-              <span
-                className="text-xs px-3 py-1 rounded-full font-medium"
-                style={{
-                  background:
-                    job.status === "complete"
-                      ? "var(--accent)"
-                      : job.status === "failed"
-                      ? "#e74c3c"
-                      : "var(--accent-med)",
-                  color: "#fff",
-                }}
-              >
-                {job.status}
-              </span>
-            </div>
-
-            <p className="text-sm mb-4" style={{ color: "var(--text2)" }}>
-              {job.progress?.detail || "Waiting..."}
-            </p>
-
-            {/* Progress bar */}
-            {job.progress?.total && job.progress?.current && (
-              <div
-                className="h-2 rounded-full overflow-hidden mb-4"
-                style={{ background: "var(--border)" }}
-              >
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    background: "var(--accent)",
-                    width: `${(job.progress.current / job.progress.total) * 100}%`,
-                  }}
-                />
-              </div>
-            )}
-
-            {job.error && (
-              <pre
-                className="text-xs p-3 rounded-lg overflow-x-auto mb-4"
-                style={{ background: "var(--bg)", color: "#e74c3c" }}
-              >
-                {job.error}
-              </pre>
-            )}
-
-            {job.status === "complete" && (
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  href={`/${subjectSlug}`}
-                  className="px-5 py-2 rounded-lg text-sm font-semibold text-white"
-                  style={{ background: "var(--accent)" }}
-                >
-                  View Lessons &rarr;
-                </Link>
-                <Link
-                  href="/profile"
-                  className="px-5 py-2 rounded-lg text-sm font-medium border"
-                  style={{ borderColor: "var(--border)", color: "var(--text2)" }}
-                >
-                  View in Profile
-                </Link>
-                <button
-                  onClick={resetForm}
-                  className="px-5 py-2 rounded-lg text-sm font-medium border"
-                  style={{ borderColor: "var(--border)", color: "var(--text2)" }}
-                >
-                  Generate More
-                </button>
-              </div>
-            )}
-
-            {job.status === "failed" && (
-              <button
-                onClick={resetForm}
-                className="mt-2 px-5 py-2 rounded-lg text-sm font-medium border"
-                style={{ borderColor: "var(--border)", color: "var(--text2)" }}
-              >
-                Try Again
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

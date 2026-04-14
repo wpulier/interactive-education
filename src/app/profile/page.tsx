@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { ActiveJobs } from "@/components/active-jobs";
 
 const API_URL = process.env.GENERATOR_API_URL || process.env.NEXT_PUBLIC_GENERATOR_API_URL || "http://localhost:8000";
 
@@ -88,50 +89,8 @@ export default async function ProfilePage() {
           </div>
         </div>
 
-        {/* Active Jobs */}
-        {activeJobs.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-lg font-semibold mb-3">Active Jobs</h2>
-            <div className="space-y-3">
-              {activeJobs.map((job) => (
-                <div
-                  key={job.job_id}
-                  className="rounded-xl border p-4"
-                  style={{ borderColor: "var(--border)", background: "var(--bg2)" }}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">
-                      {job.progress?.detail || "Processing..."}
-                    </span>
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full text-white"
-                      style={{ background: "var(--accent-med)" }}
-                    >
-                      {job.status}
-                    </span>
-                  </div>
-                  {job.progress?.total && job.progress?.current && (
-                    <div
-                      className="h-1.5 rounded-full overflow-hidden"
-                      style={{ background: "var(--border)" }}
-                    >
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          background: "var(--accent)",
-                          width: `${(job.progress.current / job.progress.total) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  )}
-                  <p className="text-xs text-[var(--text3)] mt-2">
-                    Started {new Date(job.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Active Jobs — client component with live polling */}
+        <ActiveJobs initialJobs={jobs.filter((j) => j.status === "pending" || j.status === "processing")} />
 
         {/* Your Lessons */}
         <section className="mb-10">
