@@ -92,6 +92,8 @@ async def run_pipeline(
             source_id=source.id,
             subject_slug=subject_slug,
             structure=structure,
+            user_id=user_id,
+            user_name=user_name,
         )
         db.add(curriculum)
         await db.flush()

@@ -31,6 +31,8 @@ class Curriculum(Base):
     source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"))
     subject_slug = Column(String(100), nullable=False)
     structure = Column(JSON, nullable=False)
+    user_id = Column(String(255), nullable=True)
+    user_name = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     source = relationship("Source", back_populates="curriculums")

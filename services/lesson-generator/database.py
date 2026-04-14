@@ -31,5 +31,7 @@ async def init_db():
             "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)",
             "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)",
             "ALTER TABLE lessons ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
+            "ALTER TABLE curriculums ADD COLUMN IF NOT EXISTS user_id VARCHAR(255)",
+            "ALTER TABLE curriculums ADD COLUMN IF NOT EXISTS user_name VARCHAR(255)",
         ]:
             await conn.execute(text(stmt))

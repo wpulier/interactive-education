@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Header, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, init_db, SessionLocal
@@ -79,6 +79,10 @@ class CurriculumResponse(BaseModel):
     id: str
     subject_slug: str
     structure: dict
+    user_id: str | None = None
+    user_name: str | None = None
+    created_at: str | None = None
+    lesson_count: int | None = None
 
 
 # --- Background task wrapper ---
@@ -221,8 +225,26 @@ async def list_curriculums(
 
     result = await db.execute(query)
     curriculums = result.scalars().all()
+
+    # Get lesson counts per curriculum
+    count_query = (
+        select(Lesson.curriculum_id, func.count(Lesson.id))
+        .where(Lesson.is_current == True)
+        .group_by(Lesson.curriculum_id)
+    )
+    count_result = await db.execute(count_query)
+    counts = dict(count_result.all())
+
     return [
-        CurriculumResponse(id=str(c.id), subject_slug=c.subject_slug, structure=c.structure)
+        CurriculumResponse(
+            id=str(c.id),
+            subject_slug=c.subject_slug,
+            structure=c.structure,
+            user_id=c.user_id,
+            user_name=c.user_name,
+            created_at=c.created_at.isoformat() if c.created_at else None,
+            lesson_count=counts.get(c.id, 0),
+        )
         for c in curriculums
     ]
 
@@ -272,6 +294,41 @@ async def list_user_jobs(user_id: str, db: AsyncSession = Depends(get_db)):
             completed_at=j.completed_at.isoformat() if j.completed_at else None,
         )
         for j in jobs
+    ]
+
+
+@app.get("/api/users/{user_id}/curriculums", response_model=list[CurriculumResponse])
+async def list_user_curriculums(user_id: str, db: AsyncSession = Depends(get_db)):
+    """List all curriculums created by a specific user."""
+    result = await db.execute(
+        select(Curriculum).where(Curriculum.user_id == user_id).order_by(Curriculum.created_at.desc())
+    )
+    curriculums = result.scalars().all()
+
+    # Get lesson counts per curriculum
+    curriculum_ids = [c.id for c in curriculums]
+    if curriculum_ids:
+        count_query = (
+            select(Lesson.curriculum_id, func.count(Lesson.id))
+            .where(Lesson.is_current == True, Lesson.curriculum_id.in_(curriculum_ids))
+            .group_by(Lesson.curriculum_id)
+        )
+        count_result = await db.execute(count_query)
+        counts = dict(count_result.all())
+    else:
+        counts = {}
+
+    return [
+        CurriculumResponse(
+            id=str(c.id),
+            subject_slug=c.subject_slug,
+            structure=c.structure,
+            user_id=c.user_id,
+            user_name=c.user_name,
+            created_at=c.created_at.isoformat() if c.created_at else None,
+            lesson_count=counts.get(c.id, 0),
+        )
+        for c in curriculums
     ]
 
 

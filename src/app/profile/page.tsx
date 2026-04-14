@@ -14,14 +14,18 @@ interface UserJob {
   completed_at: string | null;
 }
 
-interface UserLesson {
+interface UserCurriculum {
   id: string;
   subject_slug: string;
-  section_slug: string;
-  concept_slug: string;
-  title: string;
-  description: string | null;
-  version: number;
+  structure: {
+    title: string;
+    slug: string;
+    description: string;
+    concepts: { slug: string; title: string; description: string }[];
+  };
+  user_name: string | null;
+  created_at: string | null;
+  lesson_count: number | null;
 }
 
 async function fetchUserJobs(userId: string): Promise<UserJob[]> {
@@ -34,9 +38,9 @@ async function fetchUserJobs(userId: string): Promise<UserJob[]> {
   }
 }
 
-async function fetchUserLessons(userId: string): Promise<UserLesson[]> {
+async function fetchUserCurriculums(userId: string): Promise<UserCurriculum[]> {
   try {
-    const res = await fetch(`${API_URL}/api/users/${userId}/lessons`, { cache: "no-store" });
+    const res = await fetch(`${API_URL}/api/users/${userId}/curriculums`, { cache: "no-store" });
     if (!res.ok) return [];
     return res.json();
   } catch {
@@ -50,12 +54,11 @@ export default async function ProfilePage() {
     redirect("/auth/signin");
   }
 
-  const [jobs, lessons] = await Promise.all([
+  const [jobs, curriculums] = await Promise.all([
     fetchUserJobs(session.user.id!),
-    fetchUserLessons(session.user.id!),
+    fetchUserCurriculums(session.user.id!),
   ]);
 
-  const activeJobs = jobs.filter((j) => j.status === "pending" || j.status === "processing");
   const completedJobs = jobs.filter((j) => j.status === "complete");
   const failedJobs = jobs.filter((j) => j.status === "failed");
 
@@ -85,7 +88,7 @@ export default async function ProfilePage() {
         {/* Active Jobs — client component with live polling */}
         <ActiveJobs initialJobs={jobs.filter((j) => j.status === "pending" || j.status === "processing")} />
 
-        {/* Your Lessons */}
+        {/* Your Curriculums */}
         <section className="mb-10">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Your Lessons</h2>
@@ -96,7 +99,7 @@ export default async function ProfilePage() {
               Generate new &rarr;
             </Link>
           </div>
-          {lessons.length === 0 ? (
+          {curriculums.length === 0 ? (
             <div
               className="rounded-xl border border-dashed p-8 text-center"
               style={{ borderColor: "var(--border)" }}
@@ -110,30 +113,45 @@ export default async function ProfilePage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {lessons.map((lesson) => (
+            <div className="space-y-3">
+              {curriculums.map((curriculum) => (
                 <Link
-                  key={lesson.id}
-                  href={`/${lesson.subject_slug}/${lesson.section_slug}/${lesson.concept_slug}`}
-                  className="block rounded-xl border p-4 hover:border-[var(--accent-med)] transition-colors"
+                  key={curriculum.id}
+                  href={`/${curriculum.subject_slug}/${curriculum.structure.slug}`}
+                  className="block rounded-xl border p-5 hover:border-[var(--accent-med)] transition-colors"
                   style={{ borderColor: "var(--border)" }}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{lesson.title}</p>
-                      {lesson.description && (
-                        <p className="text-sm text-[var(--text2)] mt-0.5 line-clamp-1">
-                          {lesson.description}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-base">
+                        {curriculum.structure.title}
+                      </p>
+                      {curriculum.structure.description && (
+                        <p className="text-sm text-[var(--text2)] mt-1 line-clamp-2">
+                          {curriculum.structure.description}
                         </p>
                       )}
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-xs text-[var(--text3)]">
+                          {curriculum.lesson_count || curriculum.structure.concepts?.length || 0} lessons
+                        </span>
+                        <span className="text-xs text-[var(--text3)]">
+                          {curriculum.subject_slug}
+                        </span>
+                        {curriculum.created_at && (
+                          <span className="text-xs text-[var(--text3)]">
+                            {new Date(curriculum.created_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-xs text-[var(--text3)] shrink-0 ml-4">
-                      v{lesson.version}
+                    <span
+                      className="text-xs shrink-0 mt-1"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      Open &rarr;
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text3)] mt-1">
-                    {lesson.subject_slug} / {lesson.section_slug}
-                  </p>
                 </Link>
               ))}
             </div>

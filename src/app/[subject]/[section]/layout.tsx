@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSubject } from "@/registry";
+import { getLessons, getCurriculums } from "@/lib/api";
 import type { Section } from "@/types";
 import SectionTabs from "./section-tabs";
 import SectionNav from "./section-nav";
+
+export const dynamic = "force-dynamic";
 
 export default async function SectionLayout({
   children,
@@ -14,24 +17,54 @@ export default async function SectionLayout({
 }) {
   const { subject: subjectSlug, section: sectionSlug } = await params;
 
+  // Try static curriculum first
   const subject = getSubject(subjectSlug);
-  if (!subject) notFound();
-
   let section: Section | undefined;
-  try {
-    const mod = await import(`@/subjects/${subjectSlug}/curriculum`);
-    section = (mod.getSection as (slug: string) => Section | undefined)(
-      sectionSlug
-    );
-  } catch {
-    notFound();
-  }
-  if (!section) notFound();
+  let sectionTitle = "";
+  let subjectTitle = subject?.title || subjectSlug;
+  let tabs: { slug: string; title: string }[] = [];
 
-  const tabs: { slug: string; title: string }[] = [
-    { slug: "overview", title: "Overview" },
-    ...section.concepts.map((c) => ({ slug: c.slug, title: c.title })),
-  ];
+  if (subject) {
+    try {
+      const mod = await import(`@/subjects/${subjectSlug}/curriculum`);
+      section = (mod.getSection as (slug: string) => Section | undefined)(sectionSlug);
+    } catch {}
+  }
+
+  if (section) {
+    // Static section — use curriculum data for tabs
+    sectionTitle = section.title;
+    tabs = [
+      { slug: "overview", title: "Overview" },
+      ...section.concepts.map((c) => ({ slug: c.slug, title: c.title })),
+    ];
+  } else {
+    // Dynamic section — fetch from API
+    try {
+      const [curriculums, lessons] = await Promise.all([
+        getCurriculums(subjectSlug),
+        getLessons(subjectSlug, sectionSlug),
+      ]);
+
+      if (lessons.length === 0) notFound();
+
+      // Find the curriculum that matches this section
+      const curriculum = curriculums.find((c) => c.structure?.slug === sectionSlug);
+      sectionTitle = curriculum?.structure?.title || sectionSlug.replace(/-/g, " ");
+
+      // Build tabs from lessons
+      const overviewLesson = lessons.find((l) => l.concept_slug === "overview");
+      const conceptLessons = lessons.filter((l) => l.concept_slug !== "overview");
+
+      tabs = [];
+      if (overviewLesson) {
+        tabs.push({ slug: "overview", title: "Overview" });
+      }
+      tabs.push(...conceptLessons.map((l) => ({ slug: l.concept_slug, title: l.title })));
+    } catch {
+      notFound();
+    }
+  }
 
   const basePath = `/${subjectSlug}/${sectionSlug}`;
 
@@ -41,20 +74,20 @@ export default async function SectionLayout({
       style={{ background: "var(--bg)", color: "var(--text)" }}
     >
       {/* Header */}
-      <div className="max-w-[720px] mx-auto w-full px-6 pt-8">
+      <div className="max-w-[720px] mx-auto w-full px-6 pt-6">
         <Link
-          href={`/${subjectSlug}`}
+          href={subject ? `/${subjectSlug}` : "/profile"}
           className="text-sm text-[var(--text3)] hover:text-[var(--accent)] transition-colors"
         >
-          &larr; {subject.title}
+          &larr; {subjectTitle}
         </Link>
         <h1
           className="text-2xl mt-3 mb-0 tracking-tight"
           style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
         >
-          {section.title}
+          {sectionTitle}
         </h1>
-        {section.type === "work" && section.meta && (
+        {section?.type === "work" && section.meta && (
           <p className="text-sm text-[var(--text3)] mt-0.5">
             {section.meta.author}
             {section.meta.year && `, ${section.meta.year}`}

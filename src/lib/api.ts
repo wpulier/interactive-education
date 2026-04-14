@@ -51,6 +51,10 @@ export interface CurriculumData {
     meta?: { author?: string; year?: number };
     concepts: { slug: string; title: string; description: string }[];
   };
+  user_id?: string | null;
+  user_name?: string | null;
+  created_at?: string | null;
+  lesson_count?: number | null;
 }
 
 export interface CommunityLesson {
