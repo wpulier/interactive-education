@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 /* ── time-signature data ── */
@@ -245,16 +244,7 @@ export default function TimeSignaturesLesson() {
   }
 
   return (
-    <div className="max-w-[720px] mx-auto px-6 py-12">
-      {/* Back link */}
-      <Link
-        href="/music-theory/rhythm"
-        className="text-sm hover:text-[var(--accent)] transition-colors"
-        style={{ color: "var(--text3)" }}
-      >
-        &larr; Rhythm
-      </Link>
-
+    <div className="max-w-[720px] mx-auto px-6 py-10">
       {/* Title */}
       <h1
         className="font-serif font-normal leading-tight mt-4 mb-1"
