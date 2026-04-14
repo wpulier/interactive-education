@@ -1,7 +1,36 @@
+import Link from "next/link";
+import { curriculum } from "@/curriculum";
+
 export default function Home() {
   return (
-    <main>
-      <h1>Music Education</h1>
+    <main className="max-w-[720px] mx-auto px-6 py-12">
+      <h1 className="font-serif text-4xl mb-1 tracking-tight">
+        Music Education
+      </h1>
+      <p className="text-[var(--text2)] mb-10">
+        Interactive lessons in music theory.
+      </p>
+
+      <div className="space-y-4">
+        {curriculum.map((section) => (
+          <Link
+            key={section.slug}
+            href={`/${section.slug}`}
+            className="block p-5 rounded-2xl bg-[var(--bg2)] border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+          >
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-serif text-xl">{section.title}</h2>
+              <span className="text-xs text-[var(--text3)]">
+                {section.concepts.length}{" "}
+                {section.concepts.length === 1 ? "lesson" : "lessons"}
+              </span>
+            </div>
+            <p className="text-sm text-[var(--text2)] mt-1">
+              {section.description}
+            </p>
+          </Link>
+        ))}
+      </div>
     </main>
   );
 }
