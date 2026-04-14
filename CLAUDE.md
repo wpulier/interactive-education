@@ -1,28 +1,55 @@
-# Music Education Webapp
+# Interactive Education Webapp
 
 ## Project Structure
 
-- `src/curriculum.ts` — Central curriculum registry. Single source of truth for all sections, concepts, and lesson metadata.
-- `src/app/` — Next.js App Router pages. Dynamic routes `[section]` and `[concept]` resolve against the registry.
-- `src/lessons/` — Interactive lesson components organized by `section/concept/`.
+```
+src/
+  registry.ts              # Top-level registry: Subject[] (slug, title, description)
+  types.ts                 # Shared types: Section, Concept
+  app/                     # Next.js App Router — generalized routing
+    [subject]/
+      [section]/
+        [concept]/
+  subjects/                # Compartmentalized per-subject directories
+    music-theory/
+      curriculum.ts        # Sections + concepts for this subject
+      lessons/             # All lesson components for this subject
+        rhythm/
+          time-signatures/
+            index.tsx
+```
 
-## Critical Rule: Curriculum Registry
+## Data Model
 
-**Every new lesson MUST be registered in `src/curriculum.ts`.**
+```
+Subject → Section → Concept → Lesson
+```
 
-When adding a new lesson:
-1. Add the concept entry to the appropriate section in `src/curriculum.ts` (slug, title, description)
-2. Create the lesson component at `src/lessons/[section]/[concept]/index.tsx`
-3. The home page and section pages auto-update from the registry
+- **Subject** = top-level discipline (Music Theory, Biology, etc.)
+- **Section** = topic area within a subject (Rhythm, Melody, etc.)
+- **Concept** = individual lesson topic (Time Signatures, Note Values, etc.)
+- **Lesson** = the interactive page for a concept
 
-See `docs/curriculum-registry.md` for full documentation.
+## Critical Rules
 
-## Conventions
+### 1. Every new lesson MUST update the registry
 
-- Lessons are fully standalone — no shared layout or shell. Each lesson owns its entire page.
-- Only convention per lesson: include a back link to the parent section in the top-left.
-- Lessons are client components (`"use client"`) when they need interactivity.
-- Array order in the curriculum registry = learning progression = display order.
+- New **subject**: add entry to `src/registry.ts` + create `src/subjects/[slug]/curriculum.ts`
+- New **section/concept**: update the subject's `curriculum.ts` in `src/subjects/[subject-slug]/`
+- New **lesson component**: create at `src/subjects/[subject]/lessons/[section]/[concept]/index.tsx`
+
+### 2. Subjects are compartmentalized
+
+Each subject lives in its own directory under `src/subjects/`. Different teams own different subjects. **Never put cross-subject code in a subject directory.** Shared code goes in `src/types.ts` or `src/registry.ts`.
+
+### 3. Lessons are standalone
+
+Each lesson owns its entire page — no shared layout or shell imposed. Only convention: include a back link to the parent section in the top-left. Lessons use `"use client"` when they need interactivity.
+
+## Adding Content
+
+See `docs/data-model.md` for the full data model documentation.
+See `docs/adding-content.md` for step-by-step guides on adding subjects, sections, and lessons.
 
 ## Stack
 
