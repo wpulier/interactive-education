@@ -12,6 +12,9 @@ export interface GenerateRequest {
   source_type: "text" | "url";
   content: string;
   subject_slug: string;
+  source_title?: string;
+  source_author?: string;
+  source_publication?: string;
 }
 
 export interface JobStatus {
@@ -26,6 +29,14 @@ export interface JobStatus {
   error?: string;
 }
 
+export interface LessonSourceInfo {
+  source_type: string;
+  source_title: string | null;
+  source_author: string | null;
+  source_publication: string | null;
+  source_url: string | null;
+}
+
 export interface LessonData {
   id: string;
   subject_slug: string;
@@ -38,6 +49,7 @@ export interface LessonData {
   source_excerpt: string | null;
   user_id?: string | null;
   user_name?: string | null;
+  source_info?: LessonSourceInfo | null;
 }
 
 export interface CurriculumData {
@@ -66,6 +78,8 @@ export interface CommunityLesson {
   description: string | null;
   user_name: string | null;
   created_at: string;
+  source_type?: string | null;
+  source_title?: string | null;
 }
 
 // --- Client-side calls (through Next.js proxy) ---
@@ -103,6 +117,14 @@ export async function getJobStatus(jobId: string): Promise<JobStatus> {
   const res = await fetch(`/api/jobs/${jobId}`);
   if (!res.ok) throw new Error(`Job fetch failed: ${res.statusText}`);
   return res.json();
+}
+
+export async function deleteJob(jobId: string): Promise<void> {
+  const res = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Delete failed: ${res.statusText}`);
+  }
 }
 
 // --- Server-side calls (direct to FastAPI, used from server components) ---

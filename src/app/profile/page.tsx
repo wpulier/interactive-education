@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { ActiveJobs } from "@/components/active-jobs";
+import { JobHistory } from "@/components/job-history";
 
 const API_URL = process.env.GENERATOR_API_URL || process.env.NEXT_PUBLIC_GENERATOR_API_URL || "http://localhost:8000";
 
@@ -12,6 +13,8 @@ interface UserJob {
   error: string | null;
   created_at: string;
   completed_at: string | null;
+  subject_slug?: string | null;
+  section_slug?: string | null;
 }
 
 interface UserCurriculum {
@@ -158,38 +161,8 @@ export default async function ProfilePage() {
           )}
         </section>
 
-        {/* Job History */}
-        {(completedJobs.length > 0 || failedJobs.length > 0) && (
-          <section>
-            <h2 className="text-lg font-semibold mb-3">Job History</h2>
-            <div className="space-y-2">
-              {[...completedJobs, ...failedJobs].map((job) => (
-                <div
-                  key={job.job_id}
-                  className="rounded-xl border p-3 flex items-center justify-between"
-                  style={{ borderColor: "var(--border)" }}
-                >
-                  <div>
-                    <p className="text-sm">
-                      {job.progress?.detail || (job.status === "complete" ? "Completed" : "Failed")}
-                    </p>
-                    <p className="text-xs text-[var(--text3)]">
-                      {new Date(job.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full text-white"
-                    style={{
-                      background: job.status === "complete" ? "var(--accent)" : "#e74c3c",
-                    }}
-                  >
-                    {job.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Job History — client component with dismiss + clickable links */}
+        <JobHistory initialJobs={[...completedJobs, ...failedJobs]} />
       </div>
     </div>
   );

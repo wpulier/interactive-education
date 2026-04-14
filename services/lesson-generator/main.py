@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from database import get_db, init_db, SessionLocal
 from models import Job, Lesson, Curriculum, Source
@@ -47,6 +48,9 @@ class GenerateTextRequest(BaseModel):
     source_type: str  # "text" or "url"
     content: str
     subject_slug: str
+    source_title: str | None = None
+    source_author: str | None = None
+    source_publication: str | None = None
 
 
 class JobResponse(BaseModel):
@@ -61,6 +65,14 @@ class JobStatusResponse(BaseModel):
     error: str | None = None
 
 
+class LessonSourceInfo(BaseModel):
+    source_type: str
+    source_title: str | None = None
+    source_author: str | None = None
+    source_publication: str | None = None
+    source_url: str | None = None
+
+
 class LessonResponse(BaseModel):
     id: str
     subject_slug: str
@@ -73,6 +85,7 @@ class LessonResponse(BaseModel):
     source_excerpt: str | None
     user_id: str | None = None
     user_name: str | None = None
+    source_info: LessonSourceInfo | None = None
 
 
 class CurriculumResponse(BaseModel):
@@ -96,10 +109,17 @@ async def _run_pipeline_bg(
     file_bytes: bytes | None = None,
     user_id: str | None = None,
     user_name: str | None = None,
+    source_title: str | None = None,
+    source_author: str | None = None,
+    source_publication: str | None = None,
 ):
     """Run pipeline in background with its own DB session."""
     async with SessionLocal() as db:
-        await run_pipeline(db, job_id, source_type, content, subject_slug, file_bytes, user_id, user_name)
+        await run_pipeline(
+            db, job_id, source_type, content, subject_slug,
+            file_bytes, user_id, user_name,
+            source_title, source_author, source_publication,
+        )
 
 
 # --- Endpoints ---
@@ -135,6 +155,9 @@ async def generate_from_text(
         None,
         x_user_id,
         x_user_name,
+        request.source_title,
+        request.source_author,
+        request.source_publication,
     )
 
     return JobResponse(job_id=str(job.id), status="pending")
@@ -145,6 +168,9 @@ async def generate_from_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     subject_slug: str = Form(...),
+    source_title: str | None = Form(None),
+    source_author: str | None = Form(None),
+    source_publication: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     x_user_id: str | None = Header(None),
     x_user_name: str | None = Header(None),
@@ -165,6 +191,9 @@ async def generate_from_pdf(
         file_bytes,
         x_user_id,
         x_user_name,
+        source_title,
+        source_author,
+        source_publication,
     )
 
     return JobResponse(job_id=str(job.id), status="pending")
@@ -187,7 +216,12 @@ async def get_job_status(job_id: str, db: AsyncSession = Depends(get_db)):
 @app.get("/api/lessons/{lesson_id}", response_model=LessonResponse)
 async def get_lesson(lesson_id: str, db: AsyncSession = Depends(get_db)):
     """Get a single lesson by ID."""
-    lesson = await db.get(Lesson, lesson_id)
+    result = await db.execute(
+        select(Lesson)
+        .where(Lesson.id == lesson_id)
+        .options(joinedload(Lesson.curriculum).joinedload(Curriculum.source))
+    )
+    lesson = result.scalars().first()
     if not lesson:
         raise HTTPException(404, "Lesson not found")
     return _lesson_to_response(lesson)
@@ -200,7 +234,11 @@ async def list_lessons(
     db: AsyncSession = Depends(get_db),
 ):
     """List lessons, optionally filtered by subject and section."""
-    query = select(Lesson).where(Lesson.is_current == True)
+    query = (
+        select(Lesson)
+        .where(Lesson.is_current == True)
+        .options(joinedload(Lesson.curriculum).joinedload(Curriculum.source))
+    )
     if subject:
         query = query.where(Lesson.subject_slug == subject)
     if section:
@@ -250,6 +288,16 @@ async def list_curriculums(
 
 
 def _lesson_to_response(lesson: Lesson) -> LessonResponse:
+    source_info = None
+    if lesson.curriculum and lesson.curriculum.source:
+        src = lesson.curriculum.source
+        source_info = LessonSourceInfo(
+            source_type=src.type,
+            source_title=src.title,
+            source_author=src.author,
+            source_publication=src.publication,
+            source_url=src.original_url,
+        )
     return LessonResponse(
         id=str(lesson.id),
         subject_slug=lesson.subject_slug,
@@ -262,6 +310,7 @@ def _lesson_to_response(lesson: Lesson) -> LessonResponse:
         source_excerpt=lesson.source_excerpt,
         user_id=lesson.user_id,
         user_name=lesson.user_name,
+        source_info=source_info,
     )
 
 
@@ -275,6 +324,8 @@ class UserJobResponse(BaseModel):
     error: str | None = None
     created_at: str
     completed_at: str | None = None
+    subject_slug: str | None = None
+    section_slug: str | None = None
 
 
 @app.get("/api/users/{user_id}/jobs", response_model=list[UserJobResponse])
@@ -284,17 +335,52 @@ async def list_user_jobs(user_id: str, db: AsyncSession = Depends(get_db)):
         select(Job).where(Job.user_id == user_id).order_by(Job.created_at.desc())
     )
     jobs = result.scalars().all()
-    return [
-        UserJobResponse(
-            job_id=str(j.id),
-            status=j.status,
-            progress=j.progress or {},
-            error=j.error,
-            created_at=j.created_at.isoformat() if j.created_at else "",
-            completed_at=j.completed_at.isoformat() if j.completed_at else None,
+
+    # For completed jobs, look up the curriculum they produced (Job → Source → Curriculum)
+    source_ids = [j.source_id for j in jobs if j.status == "complete" and j.source_id]
+    curriculum_by_source: dict = {}
+    if source_ids:
+        cur_result = await db.execute(
+            select(Curriculum).where(Curriculum.source_id.in_(source_ids))
         )
-        for j in jobs
-    ]
+        for c in cur_result.scalars().all():
+            curriculum_by_source[c.source_id] = c
+
+    responses = []
+    for j in jobs:
+        subject_slug = None
+        section_slug = None
+        if j.status == "complete" and j.source_id:
+            cur = curriculum_by_source.get(j.source_id)
+            if cur:
+                subject_slug = cur.subject_slug
+                section_slug = cur.structure.get("slug") if isinstance(cur.structure, dict) else None
+        responses.append(
+            UserJobResponse(
+                job_id=str(j.id),
+                status=j.status,
+                progress=j.progress or {},
+                error=j.error,
+                created_at=j.created_at.isoformat() if j.created_at else "",
+                completed_at=j.completed_at.isoformat() if j.completed_at else None,
+                subject_slug=subject_slug,
+                section_slug=section_slug,
+            )
+        )
+    return responses
+
+
+@app.delete("/api/jobs/{job_id}")
+async def delete_job(job_id: str, db: AsyncSession = Depends(get_db)):
+    """Delete a failed job."""
+    job = await db.get(Job, job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if job.status not in ("failed",):
+        raise HTTPException(400, "Only failed jobs can be deleted")
+    await db.delete(job)
+    await db.commit()
+    return {"ok": True}
 
 
 @app.get("/api/users/{user_id}/curriculums", response_model=list[CurriculumResponse])
@@ -338,6 +424,7 @@ async def list_user_lessons(user_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Lesson)
         .where(Lesson.user_id == user_id, Lesson.is_current == True)
+        .options(joinedload(Lesson.curriculum).joinedload(Curriculum.source))
         .order_by(Lesson.created_at.desc())
     )
     lessons = result.scalars().all()
@@ -353,6 +440,8 @@ class CommunityLessonResponse(BaseModel):
     description: str | None
     user_name: str | None
     created_at: str
+    source_type: str | None = None
+    source_title: str | None = None
 
 
 @app.get("/api/community/lessons", response_model=list[CommunityLessonResponse])
@@ -361,7 +450,11 @@ async def list_community_lessons(
     db: AsyncSession = Depends(get_db),
 ):
     """List community-generated lessons, optionally filtered by subject."""
-    query = select(Lesson).where(Lesson.is_current == True, Lesson.concept_slug != "overview")
+    query = (
+        select(Lesson)
+        .where(Lesson.is_current == True, Lesson.concept_slug != "overview")
+        .options(joinedload(Lesson.curriculum).joinedload(Curriculum.source))
+    )
     if subject:
         query = query.where(Lesson.subject_slug == subject)
     query = query.order_by(Lesson.created_at.desc()).limit(50)
@@ -378,6 +471,8 @@ async def list_community_lessons(
             description=l.description,
             user_name=l.user_name,
             created_at=l.created_at.isoformat() if l.created_at else "",
+            source_type=l.curriculum.source.type if l.curriculum and l.curriculum.source else None,
+            source_title=l.curriculum.source.title if l.curriculum and l.curriculum.source else None,
         )
         for l in lessons
     ]
