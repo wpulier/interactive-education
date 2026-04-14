@@ -152,6 +152,25 @@ export default async function SubjectPage({
           </div>
         )}
       </div>
+
+      {/* Community */}
+      <div className="mt-10">
+        <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--text3)] mb-3">
+          Community
+        </h2>
+        <div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-center">
+          <p
+            className="text-lg mb-1"
+            style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
+          >
+            Create your own lessons
+          </p>
+          <p className="text-sm text-[var(--text3)]">
+            Coming soon — build and share interactive lessons with the
+            community.
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

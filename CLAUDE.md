@@ -8,13 +8,21 @@ src/
   types.ts                 # Shared types: Section, Concept
   app/                     # Next.js App Router — generalized routing
     [subject]/
+      page.tsx             # Subject page: Concepts, Works, Community sections
       [section]/
+        page.tsx           # Redirects to ./overview
+        layout.tsx         # Lesson viewer: tabs, progress bar, prev/next nav
+        section-tabs.tsx   # Client component: tab bar with active state
+        section-nav.tsx    # Client component: prev/next footer navigation
         [concept]/
+          page.tsx         # Loads lesson component (including overview)
   subjects/                # Compartmentalized per-subject directories
     music-theory/
       curriculum.ts        # Sections + concepts for this subject
       lessons/             # All lesson components for this subject
         rhythm/
+          overview/        # Overview micro-lesson (every section has one)
+            index.tsx
           time-signatures/
             index.tsx
 ```
@@ -41,13 +49,26 @@ Subject → Section → Concept → Lesson
 - New **concept/chapter**: add to the section's `concepts` array in the subject's `curriculum.ts`
 - New **lesson component**: create at `src/subjects/[subject]/lessons/[section]/[concept]/index.tsx`
 
-### 2. Subjects are compartmentalized
+### 2. Every section needs an overview lesson
+
+When creating a new section, also create `src/subjects/[subject]/lessons/[section]/overview/index.tsx`. This is a micro-lesson that introduces the section's topic. The slug `overview` is reserved — never use it as a concept slug.
+
+### 3. Subjects are compartmentalized
 
 Each subject lives in its own directory under `src/subjects/`. Different teams own different subjects. **Never put cross-subject code in a subject directory.** Shared code goes in `src/types.ts` or `src/registry.ts`.
 
-### 3. Lessons are standalone
+### 4. Lessons are standalone
 
-Each lesson owns its entire page — no shared layout or shell imposed. Only convention: include a back link to the parent section in the top-left. Lessons use `"use client"` when they need interactivity.
+Each lesson component owns its content area. The section layout provides the chrome (back link, tabs, progress bar, prev/next nav) — lessons do NOT need to include back links or navigation. Lessons use `"use client"` when they need interactivity.
+
+### 5. Lesson viewer
+
+Clicking a section redirects to `/[subject]/[section]/overview`. All lessons within a section are wrapped in a shared layout that provides:
+- Back link to the subject page
+- Section title
+- Tab bar (Overview + all concepts, current tab highlighted)
+- Progress bar (position within the section)
+- Prev/Next footer navigation with labeled links
 
 ## Adding Content
 

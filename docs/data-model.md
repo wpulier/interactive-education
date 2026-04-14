@@ -61,7 +61,7 @@ type Section = {
 
 ### Unified display
 
-Every subject page **always shows both headings** — Concepts and Works — even when one category is empty. Empty categories show "No concepts yet." or "No works yet." This keeps the data model visible and consistent across all subjects.
+Every subject page **always shows three headings** — Concepts, Works, and Community — even when a category is empty. Empty categories show "No concepts yet." / "No works yet." / "Coming soon." This keeps the data model visible and consistent across all subjects.
 
 ### How the UI distinguishes them
 
@@ -69,12 +69,12 @@ The subject page groups sections under **Concepts** and **Works** headings. Work
 
 ### Sub-concept navigation
 
-Concept sections show their child concepts inline on the subject page. Users have two navigation paths:
+Concept and work sections show their child concepts/chapters inline on the subject page. Users have two navigation paths:
 
-1. **Click the section** (e.g., "Rhythm") → go to the section page, work through concepts in order
-2. **Click a sub-concept directly** (e.g., "› Time Signatures") → jump straight to that lesson
+1. **Click the section** (e.g., "Rhythm") → enter the lesson viewer, starting at the Overview
+2. **Click a sub-concept directly** (e.g., "› Time Signatures") → jump straight to that lesson in the viewer
 
-This lets users browse the table of contents and jump to any level without navigating through intermediate pages. The section acts as a grouping header, but individual concepts are always directly accessible.
+This lets users browse the table of contents and jump to any level. The section acts as a grouping header, but individual concepts are always directly accessible.
 
 ## Concept
 
@@ -91,14 +91,31 @@ type Concept = {
 };
 ```
 
+### Reserved slug: `overview`
+
+Every section has a virtual "overview" concept that is NOT listed in the `concepts` array. The slug `overview` is reserved — never use it as a concept slug. The overview is a micro-lesson that introduces the section's topic. Its component lives at `src/subjects/[subject]/lessons/[section]/overview/index.tsx`.
+
 ## Lesson
 
-The interactive page for a concept. A React component that owns the full viewport.
+The interactive page for a concept. A React component rendered inside the lesson viewer.
 
 - Lives at `src/subjects/[subject]/lessons/[section]/[concept]/index.tsx`
-- Fully standalone — no shared layout imposed
-- Only convention: back link to parent section in top-left
+- Fully standalone in terms of content — no constraints on internal layout or styling
+- The section layout wraps lessons with navigation chrome (tabs, progress, prev/next)
+- Lessons do NOT need to include back links or navigation — the layout handles this
 - Uses `"use client"` when interactive
+
+## Lesson Viewer
+
+When a user enters a section, all lessons are displayed inside a **lesson viewer** — a shared layout that provides:
+
+- **Back link** to the subject page (`← Subject Title`)
+- **Section title** and work metadata (author/year) if applicable
+- **Tab bar** — Overview + all concepts in order, current tab highlighted, sticky on scroll
+- **Progress bar** — thin horizontal bar showing position within the section
+- **Prev/Next navigation** — footer with labeled links to adjacent lessons
+
+The viewer wraps lesson content without constraining it. Lessons have full creative freedom within the content area.
 
 ## Routing
 
@@ -108,7 +125,8 @@ Routes are generated from the data model:
 |-------|-------|-------|
 | Home | `/` | `src/registry.ts` |
 | Subject | `/music-theory` | `src/registry.ts` |
-| Section | `/music-theory/rhythm` | `src/subjects/music-theory/curriculum.ts` |
+| Section | `/music-theory/rhythm` | Redirects to `/music-theory/rhythm/overview` |
+| Overview | `/music-theory/rhythm/overview` | `src/subjects/music-theory/lessons/rhythm/overview/` |
 | Concept | `/music-theory/rhythm/time-signatures` | `src/subjects/music-theory/curriculum.ts` |
 
 Work-based routes follow the same pattern:
@@ -116,7 +134,7 @@ Work-based routes follow the same pattern:
 | Level | Route |
 |-------|-------|
 | Subject | `/biology` |
-| Work | `/biology/origin-of-species` |
+| Work | `/biology/origin-of-species` → redirects to `.../overview` |
 | Chapter | `/biology/origin-of-species/variation-under-domestication` |
 
 The URL is self-documenting — `/biology/origin-of-species/...` tells you you're in a specific work.
@@ -129,21 +147,18 @@ src/subjects/
     curriculum.ts
     lessons/
       rhythm/
+        overview/
+          index.tsx
         time-signatures/
           index.tsx
   biology/               ← Biology team's territory
     curriculum.ts
     lessons/
       origin-of-species/
+        overview/
+          index.tsx
         variation-under-domestication/
           index.tsx
-  economics/             ← Economics team's territory
-    curriculum.ts
-    lessons/
-      wealth-of-nations/
-        ...
-      general-theory/
-        ...
 ```
 
 Subjects are isolated directories. A team working on biology never touches the music-theory directory, and vice versa. The only shared touchpoints are:

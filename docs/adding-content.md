@@ -4,7 +4,7 @@
 
 1. Add a `Concept` entry to the section's `concepts` array in `src/subjects/[subject]/curriculum.ts`
 2. Create `src/subjects/[subject]/lessons/[section]/[concept]/index.tsx`
-3. Done — routing and navigation auto-update
+3. Done — routing, tabs, and navigation auto-update
 
 ### Example: Add "Note Values" to Music Theory > Rhythm
 
@@ -23,6 +23,8 @@
 ```
 
 Then create `src/subjects/music-theory/lessons/rhythm/note-values/index.tsx`.
+
+The new lesson automatically appears as a tab in the lesson viewer, gets a progress bar position, and prev/next navigation links.
 
 ## Adding a Chapter to a Work
 
@@ -48,7 +50,10 @@ Then create `src/subjects/biology/lessons/origin-of-species/variation-under-dome
 
 ## Adding a New Concept Section
 
-Add a `Section` entry with `type: "concepts"` to the subject's `sections` array.
+1. Add a `Section` entry with `type: "concepts"` to the subject's `sections` array
+2. Create the overview lesson at `src/subjects/[subject]/lessons/[section]/overview/index.tsx`
+
+The overview is a micro-lesson that introduces the section topic. Every section must have one.
 
 ### Example: Add "Melody" section to Music Theory
 
@@ -62,9 +67,12 @@ Add a `Section` entry with `type: "concepts"` to the subject's `sections` array.
 },
 ```
 
+Then create `src/subjects/music-theory/lessons/melody/overview/index.tsx` with a lesson that introduces melody.
+
 ## Adding a New Work
 
-Add a `Section` entry with `type: "work"` and `meta` to the subject's `sections` array.
+1. Add a `Section` entry with `type: "work"` and `meta` to the subject's `sections` array
+2. Create the overview lesson at `src/subjects/[subject]/lessons/[section]/overview/index.tsx`
 
 ### Example: Add "The Selfish Gene" to Biology
 
@@ -78,6 +86,8 @@ Add a `Section` entry with `type: "work"` and `meta` to the subject's `sections`
   concepts: [],  // add chapters as you build lessons
 },
 ```
+
+Then create `src/subjects/biology/lessons/selfish-gene/overview/index.tsx`.
 
 ## Adding a New Subject
 
@@ -123,12 +133,19 @@ export function getConcept(
 
 4. Done — the home page and routing auto-update.
 
+## Lesson component conventions
+
+- Lessons are `"use client"` components when they need interactivity (most do)
+- Lessons do NOT include back links or navigation — the section layout handles this
+- Lessons own their content area but are wrapped by the lesson viewer (tabs, progress, prev/next)
+- The slug `overview` is reserved — never use it as a concept slug in the curriculum
+- Use the same CSS variables as the rest of the app for theming (--bg, --text, --accent, etc.)
+
 ## Conventions
 
 - **Slugs**: lowercase, kebab-case, must match directory names
 - **Order**: array position = learning progression = display order
 - **Section type**: always specify `type: "concepts"` or `type: "work"`
 - **Work metadata**: work sections should include `meta` with `author` and `year`
-- **Lessons are standalone**: each owns its full page, no shared shell
-- **Back links**: every lesson includes `← Section Title` linking to parent section
+- **Overview required**: every section needs an overview lesson component
 - **Client components**: use `"use client"` for interactive lessons
