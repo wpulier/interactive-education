@@ -1,9 +1,10 @@
 """Lesson Generation Service — FastAPI application."""
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, Depends, Header, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -25,9 +26,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Lesson Generator", lifespan=lifespan)
 
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000",
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten in production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,6 +71,8 @@ class LessonResponse(BaseModel):
     code: str
     version: int
     source_excerpt: str | None
+    user_id: str | None = None
+    user_name: str | None = None
 
 
 class CurriculumResponse(BaseModel):
@@ -82,10 +90,12 @@ async def _run_pipeline_bg(
     content: str,
     subject_slug: str,
     file_bytes: bytes | None = None,
+    user_id: str | None = None,
+    user_name: str | None = None,
 ):
     """Run pipeline in background with its own DB session."""
     async with SessionLocal() as db:
-        await run_pipeline(db, job_id, source_type, content, subject_slug, file_bytes)
+        await run_pipeline(db, job_id, source_type, content, subject_slug, file_bytes, user_id, user_name)
 
 
 # --- Endpoints ---
@@ -101,12 +111,14 @@ async def generate_from_text(
     request: GenerateTextRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    x_user_name: str | None = Header(None),
 ):
     """Start lesson generation from text or URL source."""
     if request.source_type not in ("text", "url"):
         raise HTTPException(400, "source_type must be 'text' or 'url'")
 
-    job = Job(id=uuid.uuid4(), status="pending", progress={"stage": "queued"})
+    job = Job(id=uuid.uuid4(), status="pending", progress={"stage": "queued"}, user_id=x_user_id)
     db.add(job)
     await db.commit()
 
@@ -116,6 +128,9 @@ async def generate_from_text(
         request.source_type,
         request.content,
         request.subject_slug,
+        None,
+        x_user_id,
+        x_user_name,
     )
 
     return JobResponse(job_id=str(job.id), status="pending")
@@ -127,11 +142,13 @@ async def generate_from_pdf(
     file: UploadFile = File(...),
     subject_slug: str = Form(...),
     db: AsyncSession = Depends(get_db),
+    x_user_id: str | None = Header(None),
+    x_user_name: str | None = Header(None),
 ):
     """Start lesson generation from a PDF upload."""
     file_bytes = await file.read()
 
-    job = Job(id=uuid.uuid4(), status="pending", progress={"stage": "queued"})
+    job = Job(id=uuid.uuid4(), status="pending", progress={"stage": "queued"}, user_id=x_user_id)
     db.add(job)
     await db.commit()
 
@@ -142,6 +159,8 @@ async def generate_from_pdf(
         file.filename or "uploaded.pdf",
         subject_slug,
         file_bytes,
+        x_user_id,
+        x_user_name,
     )
 
     return JobResponse(job_id=str(job.id), status="pending")
@@ -219,4 +238,89 @@ def _lesson_to_response(lesson: Lesson) -> LessonResponse:
         code=lesson.code,
         version=lesson.version,
         source_excerpt=lesson.source_excerpt,
+        user_id=lesson.user_id,
+        user_name=lesson.user_name,
     )
+
+
+# --- User-specific endpoints ---
+
+
+class UserJobResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: dict
+    error: str | None = None
+    created_at: str
+    completed_at: str | None = None
+
+
+@app.get("/api/users/{user_id}/jobs", response_model=list[UserJobResponse])
+async def list_user_jobs(user_id: str, db: AsyncSession = Depends(get_db)):
+    """List all jobs for a specific user."""
+    result = await db.execute(
+        select(Job).where(Job.user_id == user_id).order_by(Job.created_at.desc())
+    )
+    jobs = result.scalars().all()
+    return [
+        UserJobResponse(
+            job_id=str(j.id),
+            status=j.status,
+            progress=j.progress or {},
+            error=j.error,
+            created_at=j.created_at.isoformat() if j.created_at else "",
+            completed_at=j.completed_at.isoformat() if j.completed_at else None,
+        )
+        for j in jobs
+    ]
+
+
+@app.get("/api/users/{user_id}/lessons", response_model=list[LessonResponse])
+async def list_user_lessons(user_id: str, db: AsyncSession = Depends(get_db)):
+    """List all lessons created by a specific user."""
+    result = await db.execute(
+        select(Lesson)
+        .where(Lesson.user_id == user_id, Lesson.is_current == True)
+        .order_by(Lesson.created_at.desc())
+    )
+    lessons = result.scalars().all()
+    return [_lesson_to_response(l) for l in lessons]
+
+
+class CommunityLessonResponse(BaseModel):
+    id: str
+    subject_slug: str
+    section_slug: str
+    concept_slug: str
+    title: str
+    description: str | None
+    user_name: str | None
+    created_at: str
+
+
+@app.get("/api/community/lessons", response_model=list[CommunityLessonResponse])
+async def list_community_lessons(
+    subject: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """List community-generated lessons, optionally filtered by subject."""
+    query = select(Lesson).where(Lesson.is_current == True, Lesson.concept_slug != "overview")
+    if subject:
+        query = query.where(Lesson.subject_slug == subject)
+    query = query.order_by(Lesson.created_at.desc()).limit(50)
+
+    result = await db.execute(query)
+    lessons = result.scalars().all()
+    return [
+        CommunityLessonResponse(
+            id=str(l.id),
+            subject_slug=l.subject_slug,
+            section_slug=l.section_slug,
+            concept_slug=l.concept_slug,
+            title=l.title,
+            description=l.description,
+            user_name=l.user_name,
+            created_at=l.created_at.isoformat() if l.created_at else "",
+        )
+        for l in lessons
+    ]

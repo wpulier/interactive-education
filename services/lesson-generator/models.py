@@ -51,6 +51,8 @@ class Lesson(Base):
     version = Column(Integer, default=1)
     is_current = Column(Boolean, default=True)
     source_excerpt = Column(Text)
+    user_id = Column(String(255), nullable=True)
+    user_name = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     curriculum = relationship("Curriculum", back_populates="lessons")
@@ -61,6 +63,7 @@ class Job(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_id = Column(UUID(as_uuid=True), ForeignKey("sources.id"))
+    user_id = Column(String(255), nullable=True)
     status = Column(String(20), default="pending")
     progress = Column(JSON, default=dict)
     error = Column(Text)

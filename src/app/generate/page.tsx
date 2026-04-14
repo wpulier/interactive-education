@@ -1,12 +1,47 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { startGeneration, startPdfGeneration, getJobStatus, type JobStatus } from "@/lib/api";
 
 type SourceType = "text" | "url" | "pdf";
 
 export default function GeneratePage() {
+  const { data: session, status: authStatus } = useSession();
+
+  if (authStatus === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-[var(--text3)]">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!session?.user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1
+            className="text-2xl mb-2"
+            style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
+          >
+            Sign in to generate lessons
+          </h1>
+          <p className="text-[var(--text2)] mb-6">
+            You need an account to create and track lesson generations.
+          </p>
+          <button
+            onClick={() => signIn("google")}
+            className="px-6 py-3 rounded-lg text-sm font-semibold text-white"
+            style={{ background: "var(--accent)" }}
+          >
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    );
+  }
   const [sourceType, setSourceType] = useState<SourceType>("text");
   const [content, setContent] = useState("");
   const [subjectSlug, setSubjectSlug] = useState("community");
@@ -255,13 +290,20 @@ export default function GeneratePage() {
             )}
 
             {job.status === "complete" && (
-              <div className="mt-4 flex gap-3">
+              <div className="mt-4 flex flex-wrap gap-3">
                 <Link
                   href={`/${subjectSlug}`}
                   className="px-5 py-2 rounded-lg text-sm font-semibold text-white"
                   style={{ background: "var(--accent)" }}
                 >
                   View Lessons &rarr;
+                </Link>
+                <Link
+                  href="/profile"
+                  className="px-5 py-2 rounded-lg text-sm font-medium border"
+                  style={{ borderColor: "var(--border)", color: "var(--text2)" }}
+                >
+                  View in Profile
                 </Link>
                 <button
                   onClick={resetForm}

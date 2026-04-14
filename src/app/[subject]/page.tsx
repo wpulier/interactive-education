@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { subjects, getSubject } from "@/registry";
+import { getCommunityLessons, type CommunityLesson } from "@/lib/api";
 import type { Section } from "@/types";
 
 export function generateStaticParams() {
@@ -26,6 +27,13 @@ export default async function SubjectPage({
 
   const conceptSections = sections.filter((s) => s.type === "concepts");
   const workSections = sections.filter((s) => s.type === "work");
+
+  let communityLessons: CommunityLesson[] = [];
+  try {
+    communityLessons = await getCommunityLessons(subjectSlug);
+  } catch {
+    // API unavailable — show empty community section
+  }
 
   return (
     <main className="max-w-[720px] mx-auto px-6 py-12">
@@ -158,18 +166,59 @@ export default async function SubjectPage({
         <h2 className="text-xs font-medium uppercase tracking-widest text-[var(--text3)] mb-3">
           Community
         </h2>
-        <div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-center">
-          <p
-            className="text-lg mb-1"
-            style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
-          >
-            Create your own lessons
-          </p>
-          <p className="text-sm text-[var(--text3)]">
-            Coming soon — build and share interactive lessons with the
-            community.
-          </p>
-        </div>
+        {communityLessons.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[var(--border)] p-6 text-center">
+            <p
+              className="text-lg mb-1"
+              style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
+            >
+              Create your own lessons
+            </p>
+            <p className="text-sm text-[var(--text3)] mb-4">
+              Be the first to contribute interactive lessons to this subject.
+            </p>
+            <Link
+              href="/generate"
+              className="inline-block px-5 py-2 rounded-lg text-sm font-semibold text-white"
+              style={{ background: "var(--accent)" }}
+            >
+              Generate Lessons
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {communityLessons.map((lesson) => (
+              <Link
+                key={lesson.id}
+                href={`/${lesson.subject_slug}/${lesson.section_slug}/${lesson.concept_slug}`}
+                className="block rounded-xl border p-4 hover:border-[var(--accent-med)] transition-colors"
+                style={{ borderColor: "var(--border)" }}
+              >
+                <div className="flex items-baseline justify-between">
+                  <h3 className="font-medium">{lesson.title}</h3>
+                  {lesson.user_name && (
+                    <span className="text-xs text-[var(--text3)] shrink-0 ml-3">
+                      by {lesson.user_name}
+                    </span>
+                  )}
+                </div>
+                {lesson.description && (
+                  <p className="text-sm text-[var(--text2)] mt-0.5 line-clamp-1">
+                    {lesson.description}
+                  </p>
+                )}
+              </Link>
+            ))}
+            <div className="pt-2 text-center">
+              <Link
+                href="/generate"
+                className="text-sm text-[var(--accent)] hover:underline"
+              >
+                Generate more lessons &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

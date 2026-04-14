@@ -8,6 +8,17 @@ API_PORT ?= 8000
 DATABASE_URL ?= postgresql://postgres:postgres@localhost:5432/lessons
 ANTHROPIC_API_KEY ?= $(shell echo $$ANTHROPIC_API_KEY)
 NEXT_PUBLIC_GENERATOR_API_URL ?= http://localhost:$(API_PORT)
+GENERATOR_API_URL ?= http://localhost:$(API_PORT)
+
+# Auth (NextAuth.js)
+AUTH_SECRET ?= $(shell echo $$AUTH_SECRET)
+NEXTAUTH_URL ?= http://localhost:3000
+ADMIN_USERNAME ?= admin
+ADMIN_PASSWORD ?= musicedu2024
+
+# Google OAuth (optional)
+GOOGLE_CLIENT_ID ?= $(shell echo $$GOOGLE_CLIENT_ID)
+GOOGLE_CLIENT_SECRET ?= $(shell echo $$GOOGLE_CLIENT_SECRET)
 
 # ── Aggregate targets ────────────────────────────────────────────────
 
@@ -121,6 +132,13 @@ _frontend-start:
 		rm -rf .next; \
 		env -u PORT \
 			NEXT_PUBLIC_GENERATOR_API_URL="$(NEXT_PUBLIC_GENERATOR_API_URL)" \
+			GENERATOR_API_URL="$(GENERATOR_API_URL)" \
+			AUTH_SECRET="$(AUTH_SECRET)" \
+			NEXTAUTH_URL="$(NEXTAUTH_URL)" \
+			ADMIN_USERNAME="$(ADMIN_USERNAME)" \
+			ADMIN_PASSWORD="$(ADMIN_PASSWORD)" \
+			GOOGLE_CLIENT_ID="$(GOOGLE_CLIENT_ID)" \
+			GOOGLE_CLIENT_SECRET="$(GOOGLE_CLIENT_SECRET)" \
 			npm run dev > .frontend.log 2>&1 & \
 		echo $$! > .frontend.pid; \
 		sleep 3; \

@@ -24,6 +24,8 @@ async def run_pipeline(
     content: str,
     subject_slug: str,
     file_bytes: bytes | None = None,
+    user_id: str | None = None,
+    user_name: str | None = None,
 ):
     """Run the full generation pipeline for a job."""
     job = await db.get(Job, job_id)
@@ -144,6 +146,8 @@ async def run_pipeline(
                 description=concept.get("description", ""),
                 code=code,
                 source_excerpt=source_excerpt[:5000],
+                user_id=user_id,
+                user_name=user_name,
             )
             db.add(lesson)
             await db.flush()
@@ -192,6 +196,8 @@ Make it engaging and set the stage for the deeper lessons that follow.""",
             title="Overview",
             description=f"Introduction to {structure.get('title', 'this section')}",
             code=overview_code,
+            user_id=user_id,
+            user_name=user_name,
         )
         db.add(overview_lesson)
         await db.commit()
